@@ -2,16 +2,16 @@
 .SUFFIXES:
 
 # Target architecture to build for. Default to x86_64.
-ARCH := x86_64
+ARCH ?= x86_64
 
 # Default user QEMU flags. These are appended to the QEMU command calls.
-QEMUFLAGS := -m 2G
+QEMUFLAGS := -m 2G -serial file:qemuSerial.log
 
-override IMAGE_NAME := template-$(ARCH)
+override IMAGE_NAME := plos-$(ARCH)
 
 # Toolchain for building the 'limine' executable for the host.
 HOST_CC := cc
-HOST_CFLAGS := -g -O2 -pipe
+HOST_CFLAGS := -g -O2
 HOST_CPPFLAGS :=
 HOST_LDFLAGS :=
 HOST_LIBS :=
@@ -19,14 +19,8 @@ HOST_LIBS :=
 .PHONY: all
 all: $(IMAGE_NAME).iso
 
-.PHONY: all-hdd
-all-hdd: $(IMAGE_NAME).hdd
-
 .PHONY: run
 run: run-$(ARCH)
-
-.PHONY: run-hdd
-run-hdd: run-hdd-$(ARCH)
 
 .PHONY: run-x86_64
 run-x86_64: edk2-ovmf $(IMAGE_NAME).iso
@@ -34,14 +28,6 @@ run-x86_64: edk2-ovmf $(IMAGE_NAME).iso
 		-M q35 \
 		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
 		-cdrom $(IMAGE_NAME).iso \
-		$(QEMUFLAGS)
-
-.PHONY: run-hdd-x86_64
-run-hdd-x86_64: edk2-ovmf $(IMAGE_NAME).hdd
-	qemu-system-$(ARCH) \
-		-M q35 \
-		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-hda $(IMAGE_NAME).hdd \
 		$(QEMUFLAGS)
 
 .PHONY: run-aarch64
@@ -57,19 +43,6 @@ run-aarch64: edk2-ovmf $(IMAGE_NAME).iso
 		-cdrom $(IMAGE_NAME).iso \
 		$(QEMUFLAGS)
 
-.PHONY: run-hdd-aarch64
-run-hdd-aarch64: edk2-ovmf $(IMAGE_NAME).hdd
-	qemu-system-$(ARCH) \
-		-M virt \
-		-cpu cortex-a72 \
-		-device ramfb \
-		-device qemu-xhci \
-		-device usb-kbd \
-		-device usb-mouse \
-		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-hda $(IMAGE_NAME).hdd \
-		$(QEMUFLAGS)
-
 .PHONY: run-riscv64
 run-riscv64: edk2-ovmf $(IMAGE_NAME).iso
 	qemu-system-$(ARCH) \
@@ -81,19 +54,6 @@ run-riscv64: edk2-ovmf $(IMAGE_NAME).iso
 		-device usb-mouse \
 		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
 		-cdrom $(IMAGE_NAME).iso \
-		$(QEMUFLAGS)
-
-.PHONY: run-hdd-riscv64
-run-hdd-riscv64: edk2-ovmf $(IMAGE_NAME).hdd
-	qemu-system-$(ARCH) \
-		-M virt \
-		-cpu rv64 \
-		-device ramfb \
-		-device qemu-xhci \
-		-device usb-kbd \
-		-device usb-mouse \
-		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-hda $(IMAGE_NAME).hdd \
 		$(QEMUFLAGS)
 
 .PHONY: run-loongarch64
@@ -109,33 +69,12 @@ run-loongarch64: edk2-ovmf $(IMAGE_NAME).iso
 		-cdrom $(IMAGE_NAME).iso \
 		$(QEMUFLAGS)
 
-.PHONY: run-hdd-loongarch64
-run-hdd-loongarch64: edk2-ovmf $(IMAGE_NAME).hdd
-	qemu-system-$(ARCH) \
-		-M virt \
-		-cpu la464 \
-		-device ramfb \
-		-device qemu-xhci \
-		-device usb-kbd \
-		-device usb-mouse \
-		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
-		-hda $(IMAGE_NAME).hdd \
-		$(QEMUFLAGS)
-
-
 .PHONY: run-bios
 run-bios: $(IMAGE_NAME).iso
 	qemu-system-$(ARCH) \
 		-M q35 \
 		-cdrom $(IMAGE_NAME).iso \
 		-boot d \
-		$(QEMUFLAGS)
-
-.PHONY: run-hdd-bios
-run-hdd-bios: $(IMAGE_NAME).hdd
-	qemu-system-$(ARCH) \
-		-M q35 \
-		-hda $(IMAGE_NAME).hdd \
 		$(QEMUFLAGS)
 
 edk2-ovmf:
@@ -204,34 +143,6 @@ ifeq ($(ARCH),loongarch64)
 		iso_root -o $(IMAGE_NAME).iso
 endif
 	rm -rf iso_root
-
-$(IMAGE_NAME).hdd: limine/limine kernel
-	rm -f $(IMAGE_NAME).hdd
-	dd if=/dev/zero bs=1M count=0 seek=64 of=$(IMAGE_NAME).hdd
-ifeq ($(ARCH),x86_64)
-	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00 -m 1
-	./limine/limine bios-install $(IMAGE_NAME).hdd
-else
-	PATH=$$PATH:/usr/sbin:/sbin sgdisk $(IMAGE_NAME).hdd -n 1:2048 -t 1:ef00
-endif
-	mformat -i $(IMAGE_NAME).hdd@@1M
-	mmd -i $(IMAGE_NAME).hdd@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine
-	mcopy -i $(IMAGE_NAME).hdd@@1M kernel/bin-$(ARCH)/kernel ::/boot
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine.conf ::/boot/limine
-ifeq ($(ARCH),x86_64)
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/limine-bios.sys ::/boot/limine
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTX64.EFI ::/EFI/BOOT
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTIA32.EFI ::/EFI/BOOT
-endif
-ifeq ($(ARCH),aarch64)
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTAA64.EFI ::/EFI/BOOT
-endif
-ifeq ($(ARCH),riscv64)
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTRISCV64.EFI ::/EFI/BOOT
-endif
-ifeq ($(ARCH),loongarch64)
-	mcopy -i $(IMAGE_NAME).hdd@@1M limine/BOOTLOONGARCH64.EFI ::/EFI/BOOT
-endif
 
 .PHONY: clean
 clean:

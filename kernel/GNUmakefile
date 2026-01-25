@@ -7,23 +7,15 @@ override OUTPUT := kernel
 
 # Target architecture to build for. Default to x86_64.
 ARCH := x86_64
-
-# Install prefix; /usr/local is a good, standard default pick.
-PREFIX := /usr/local
+export ARCH
 
 # Check if the architecture is supported.
 ifeq ($(filter $(ARCH),aarch64 loongarch64 riscv64 x86_64),)
     $(error Architecture $(ARCH) not supported)
 endif
 
-# User controllable toolchain and toolchain prefix.
-TOOLCHAIN :=
+# User controllable toolchain prefix.
 TOOLCHAIN_PREFIX :=
-ifneq ($(TOOLCHAIN),)
-    ifeq ($(TOOLCHAIN_PREFIX),)
-        TOOLCHAIN_PREFIX := $(TOOLCHAIN)-
-    endif
-endif
 
 # User controllable C compiler command.
 ifneq ($(TOOLCHAIN_PREFIX),)
@@ -35,14 +27,8 @@ endif
 # User controllable linker command.
 LD := $(TOOLCHAIN_PREFIX)ld
 
-# Defaults overrides for variables if using "llvm" as toolchain.
-ifeq ($(TOOLCHAIN),llvm)
-    CC := clang
-    LD := ld.lld
-endif
-
 # User controllable C flags.
-CFLAGS := -g -O2 -pipe
+CFLAGS := -g -O2
 
 # User controllable C preprocessor flags. We set none by default.
 CPPFLAGS :=
@@ -62,9 +48,6 @@ ifneq ($(filter-out clean distclean,$(MAKECMDGOALS)),)
     endif
 endif
 
-# Check if CC is Clang.
-override CC_IS_CLANG := $(shell ! $(CC) --version 2>/dev/null | grep -q '^Target: '; echo $$?)
-
 # Internal C flags that should not be changed by the user.
 override CFLAGS += \
     -Wall \
@@ -83,6 +66,7 @@ override CFLAGS += \
 override CPPFLAGS := \
     -I src \
     -I limine-protocol/include \
+    -isystem include \
     -isystem freestnd-c-hdrs/include \
     $(CPPFLAGS) \
     -MMD \
@@ -97,10 +81,6 @@ endif
 
 # Architecture specific internal flags.
 ifeq ($(ARCH),x86_64)
-    ifeq ($(CC_IS_CLANG),1)
-        override CC += \
-            -target x86_64-unknown-none-elf
-    endif
     override CFLAGS += \
         -m64 \
         -march=x86-64 \
@@ -118,10 +98,6 @@ ifeq ($(ARCH),x86_64)
         $(NASMFLAGS)
 endif
 ifeq ($(ARCH),aarch64)
-    ifeq ($(CC_IS_CLANG),1)
-        override CC += \
-            -target aarch64-unknown-none-elf
-    endif
     override CFLAGS += \
         -mcpu=generic \
         -march=armv8-a+nofp+nosimd \
@@ -130,10 +106,6 @@ ifeq ($(ARCH),aarch64)
         -m aarch64elf
 endif
 ifeq ($(ARCH),riscv64)
-    ifeq ($(CC_IS_CLANG),1)
-        override CC += \
-            -target riscv64-unknown-none-elf
-    endif
     override CFLAGS += \
         -march=rv64imac_zicsr_zifencei \
         -mabi=lp64 \
@@ -143,10 +115,6 @@ ifeq ($(ARCH),riscv64)
         --no-relax
 endif
 ifeq ($(ARCH),loongarch64)
-    ifeq ($(CC_IS_CLANG),1)
-        override CC += \
-            -target loongarch64-unknown-none-elf
-    endif
     override CFLAGS += \
         -march=loongarch64 \
         -mabi=lp64s \
@@ -165,8 +133,7 @@ override LDFLAGS += \
     -T linker-scripts/$(ARCH).lds
 
 # Use "find" to glob all *.c, *.S, and *.asm files in the tree
-# (except the src/arch/* directories, as those are gonna be added
-# in the next step).
+# (except the src/arch/* directories, as those are gonna be added in the next step).
 override SRCFILES := $(shell find -L src cc-runtime/src -type f -not -path 'src/arch/*' 2>/dev/null | LC_ALL=C sort)
 # Add architecture specific files, if they exist.
 override SRCFILES += $(shell find -L src/arch/$(ARCH) -type f 2>/dev/null | LC_ALL=C sort)
@@ -174,11 +141,11 @@ override SRCFILES += $(shell find -L src/arch/$(ARCH) -type f 2>/dev/null | LC_A
 override CFILES := $(filter %.c,$(SRCFILES))
 override ASFILES := $(filter %.S,$(SRCFILES))
 ifeq ($(ARCH),x86_64)
-override NASMFILES := $(filter %.asm,$(SRCFILES))
+    override NASMFILES := $(filter %.asm,$(SRCFILES))
 endif
 override OBJ := $(addprefix obj-$(ARCH)/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o))
 ifeq ($(ARCH),x86_64)
-override OBJ += $(addprefix obj-$(ARCH)/,$(NASMFILES:.asm=.asm.o))
+    override OBJ += $(addprefix obj-$(ARCH)/,$(NASMFILES:.asm=.asm.o))
 endif
 override HEADER_DEPS := $(addprefix obj-$(ARCH)/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
@@ -219,16 +186,4 @@ clean:
 # Remove everything built and generated including downloaded dependencies.
 .PHONY: distclean
 distclean:
-	rm -rf bin-* obj-* .deps-obtained .cache compile_commands.json freestnd-c-hdrs cc-runtime limine-protocol
-
-# Install the final built executable to its final on-root location.
-.PHONY: install
-install: all
-	install -d "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)"
-	install -m 644 bin-$(ARCH)/$(OUTPUT) "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)/$(OUTPUT)-$(ARCH)"
-
-# Try to undo whatever the "install" target did.
-.PHONY: uninstall
-uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)/$(OUTPUT)-$(ARCH)"
-	-rmdir "$(DESTDIR)$(PREFIX)/share/$(OUTPUT)"
+	rm -rf bin-* obj-* .deps-obtained .cache compile_commands.json cc-runtime limine-protocol
