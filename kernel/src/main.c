@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <limine.h>
 #include <hal/cpu.h>
+#include <hal/devices.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -26,6 +27,7 @@ void kmain(void) {
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
 
     hal_initialize_cpu();
+    hal_initialize_devices();
     
     // Note: we assume the framebuffer model is RGB with 32-bit pixels.
     for (size_t i = 0; i < 100; i++) {

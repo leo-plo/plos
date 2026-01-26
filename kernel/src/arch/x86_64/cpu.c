@@ -1,5 +1,6 @@
 #include <hal/cpu.h>
 #include "gdt/gdt.h"
+#include "idt/idt.h"
 
 __attribute__((noreturn)) void hal_hcf(void)
 {
@@ -12,4 +13,5 @@ __attribute__((noreturn)) void hal_hcf(void)
 void hal_initialize_cpu(void)
 {
     gdt_initialize_gdtTable();
+    idt_initialize_idtTable();
 }

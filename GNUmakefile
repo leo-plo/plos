@@ -30,6 +30,15 @@ run-x86_64: edk2-ovmf $(IMAGE_NAME).iso
 		-cdrom $(IMAGE_NAME).iso \
 		$(QEMUFLAGS)
 
+.PHONY: debug-x86_64
+debug-x86_64: edk2-ovmf $(IMAGE_NAME).iso
+	qemu-system-$(ARCH) \
+		-M q35 \
+		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-$(ARCH).fd,readonly=on \
+		-cdrom $(IMAGE_NAME).iso \
+		-s -S\
+		$(QEMUFLAGS)
+
 .PHONY: run-aarch64
 run-aarch64: edk2-ovmf $(IMAGE_NAME).iso
 	qemu-system-$(ARCH) \
