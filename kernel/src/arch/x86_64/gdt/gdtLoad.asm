@@ -16,5 +16,4 @@ gdt_load:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    sti
     ret

@@ -5,6 +5,9 @@
 
 #define IDT_NUM_ENTRIES 256
 
+#define IDT_GATE_INTERRUPT_TYPE 0b1110
+#define IDT_GATE_TRAP_TYPE 0b1111
+
 struct idt_descriptor
 {
     uint16_t offset_1;

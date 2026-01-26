@@ -35,6 +35,10 @@ void kmain(void) {
         fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;
     }
 
+    int a = 3;
+    int b = 0;
+    int c = a / b;
+
     // We're done, just hang...
     hal_hcf();
 }
