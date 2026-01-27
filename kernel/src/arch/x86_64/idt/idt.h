@@ -27,5 +27,6 @@ struct idtr
 
 extern void idt_load(struct idtr* idtr);
 void idt_initialize_idtTable(void);
+void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags);
 
 #endif // IDT_H

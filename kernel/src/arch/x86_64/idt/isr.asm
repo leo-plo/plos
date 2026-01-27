@@ -1,3 +1,11 @@
+; Otherwise nasm complains that if the linker relocates
+; interrupt_handler too far it may break (won't happen :) )
+[warning -reloc-abs-qword] 
+[warning -reloc-rel-dword]
+
+default rel
+section .text
+
 ; We define a stub for the isr's which don't push an error code
 %macro no_error_code_interrupt_handler 1
 global interrupt_handler_%1
@@ -98,11 +106,20 @@ no_error_code_interrupt_handler 29
 error_code_interrupt_handler    30
 no_error_code_interrupt_handler 31
 
+; Create the remaining interrupt handlers
+%assign i 32
+%rep 256-32
+    no_error_code_interrupt_handler i
+    %assign i i+1
+%endrep
+
+section .data
+
 ; Define a function pointer array to our handlers
 global isr_stub_table
 isr_stub_table:
     %assign i 0 
-    %rep    32 
+    %rep    256
         dq interrupt_handler_%+i
     %assign i i+1 
 %endrep
