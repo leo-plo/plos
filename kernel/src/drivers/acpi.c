@@ -5,6 +5,8 @@
 #include <libk/string.h>
 
 static bool useXSDT = false;
+static struct RSDT *currentRSDT = NULL;
+static struct XSDT *currentXSDT = NULL;
 
 static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
     uint32_t sum = 0;
@@ -15,7 +17,8 @@ static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
 }
 
 // Returns true if the rdsp is initialized correctly
-bool acpi_verify_rsdp(void *rsdp_addr)
+// Side effect: Sets the useXSDT global variable to the correct value
+bool acpi_set_correct_RSDT(void *rsdp_addr)
 {
     struct RSDPDescriptorV2 *rsdp = rsdp_addr;
     if(!rsdp)
@@ -33,7 +36,23 @@ bool acpi_verify_rsdp(void *rsdp_addr)
     }
 
     useXSDT = rsdp->Revision == 2;
+    if(useXSDT)
+        currentXSDT = (struct XSDT *)rsdp->XSDTAddress;
+    else
+        currentRSDT = (struct RSDT *)(uint64_t)rsdp->RsdtAddress;
 
     return checksum_RSDP((uint8_t *)rsdp, useXSDT ? sizeof(struct RSDPDescriptorV2) :
                                                     sizeof(struct RSDPDescriptorV1));
+}
+
+// Returns true if the RSDP revision in 2
+bool acpi_isXSDT(void)
+{
+    return useXSDT;
+}
+
+// Returns the local table
+void *acpi_getCurrent_RSDT(void)
+{
+    return useXSDT ? currentXSDT : currentXSDT; 
 }

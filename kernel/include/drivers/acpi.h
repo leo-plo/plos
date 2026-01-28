@@ -28,6 +28,28 @@ struct RSDPDescriptorV2 {
     uint8_t Reserved[3];
 } __attribute__((packed));
 
+struct ACPISDTHeader {
+    char Signature[4];
+    uint32_t Length;
+    uint8_t Revision;
+    uint8_t Checksum;
+    char OEMID[6];
+    char OEMTableID[8];
+    uint32_t OEMRevision;
+    uint32_t CreatorID;
+    uint32_t CreatorRevision;
+} __attribute__((packed));
+
+struct RSDT {
+    struct ACPISDTHeader sdtHeader; //signature "RSDT"
+    uint32_t sdtAddresses[];
+} __attribute__((packed));
+
+struct XSDT {
+    struct ACPISDTHeader sdtHeader; //signature "XSDT"
+    uint64_t sdtAddresses[];
+} __attribute__((packed));
+
 bool acpi_verify_rsdp(void *rsdp);
 
 #endif // ACPI_H
