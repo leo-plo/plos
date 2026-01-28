@@ -50,6 +50,8 @@ struct XSDT {
     uint64_t sdtAddresses[];
 } __attribute__((packed));
 
-bool acpi_verify_rsdp(void *rsdp);
+bool acpi_set_correct_RSDT(void *rsdp_addr);
+bool acpi_isXSDT(void);
+void *acpi_getCurrent_RSDT(void);
 
 #endif // ACPI_H

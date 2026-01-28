@@ -9,6 +9,7 @@
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
 extern struct limine_rsdp_request rsdp_request;
+extern struct limine_hhdm_request hhdm_request;
 
 // The following will be our kernel's entry point.
 // If renaming kmain() to something else, make sure to change the
@@ -31,12 +32,17 @@ void kmain(void) {
         hal_hcf();
     }
 
+    // Ensure we got the hhdm.
+    if (hhdm_request.response == NULL) {
+        hal_hcf();
+    }
+
     // Fetch the first framebuffer.
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
 
     hal_initialize_cpu();
     hal_initialize_devices();
-    if(!acpi_verify_rsdp(rsdp_request.response->address))
+    if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {
         log_to_serial("[ERROR] The RSDP is invalid\n");
         hal_hcf();

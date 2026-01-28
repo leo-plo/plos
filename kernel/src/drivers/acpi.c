@@ -1,4 +1,5 @@
 #include <drivers/acpi.h>
+#include <memory/hhdm.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -37,9 +38,9 @@ bool acpi_set_correct_RSDT(void *rsdp_addr)
 
     useXSDT = rsdp->Revision == 2;
     if(useXSDT)
-        currentXSDT = (struct XSDT *)rsdp->XSDTAddress;
+        currentXSDT = (struct XSDT *) hhdm_physToVirt((void *)rsdp->XSDTAddress);
     else
-        currentRSDT = (struct RSDT *)(uint64_t)rsdp->RsdtAddress;
+        currentRSDT = (struct RSDT *) hhdm_physToVirt((void *)(uint64_t)rsdp->RsdtAddress);
 
     return checksum_RSDP((uint8_t *)rsdp, useXSDT ? sizeof(struct RSDPDescriptorV2) :
                                                     sizeof(struct RSDPDescriptorV1));
@@ -54,5 +55,5 @@ bool acpi_isXSDT(void)
 // Returns the local table
 void *acpi_getCurrent_RSDT(void)
 {
-    return useXSDT ? currentXSDT : currentXSDT; 
+    return useXSDT ? (void *)currentXSDT : (void *)currentRSDT; 
 }
