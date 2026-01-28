@@ -6,8 +6,7 @@
 #include <libk/string.h>
 
 static bool useXSDT = false;
-static struct RSDT *currentRSDT = NULL;
-static struct XSDT *currentXSDT = NULL;
+void* currentRSDT = NULL;
 
 static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
     uint32_t sum = 0;
@@ -34,16 +33,14 @@ bool acpi_set_correct_RSDT(void *rsdp_addr)
     }
 
     useXSDT = rsdp->Revision == 2;
-    if(useXSDT)
-        currentXSDT = (struct XSDT *) hhdm_physToVirt((void *)rsdp->XSDTAddress);
-    else
-        currentRSDT = (struct RSDT *) hhdm_physToVirt((void *)(uint64_t)rsdp->RsdtAddress);
+    currentRSDT = hhdm_physToVirt(useXSDT ? (void *)rsdp->XSDTAddress : 
+                    (void *)(uint64_t)rsdp->RsdtAddress);
 
     return checksum_RSDP((uint8_t *)rsdp, useXSDT ? sizeof(struct RSDPDescriptorV2) :
-                                                    sizeof(struct RSDPDescriptorV1));
+                    sizeof(struct RSDPDescriptorV1));
 }
 
-// Returns true if the RSDP revision in 2
+// Returns true if the RSDP revision is 2
 bool acpi_isXSDT(void)
 {
     return useXSDT;
@@ -52,21 +49,21 @@ bool acpi_isXSDT(void)
 // Returns the local table
 void *acpi_getCurrent_RSDT(void)
 {
-    return useXSDT ? (void *)currentXSDT : (void *)currentRSDT; 
+    return currentRSDT; 
 }
 
-// Trova una tabella specifica (es. "APIC")
+// Find a specific sdt table (es. "MADT")
 void *acpi_find_table(const char *signature)
 {
-    size_t numEntries = useXSDT ? (currentXSDT->sdtHeader.Length - sizeof(currentXSDT->sdtHeader)) / 
-                                    sizeof(currentXSDT->sdtAddresses[0]) :
-                                  (currentRSDT->sdtHeader.Length - sizeof(currentRSDT->sdtHeader)) / 
-                                    sizeof(currentRSDT->sdtAddresses[0]) ;
+    struct RSDT *rsdt = currentRSDT;
+    struct XSDT *xsdt = currentRSDT;
+
+    size_t numEntries = useXSDT ? (xsdt->sdtHeader.Length - sizeof(xsdt->sdtHeader)) / sizeof(xsdt->sdtAddresses[0])
+                            : (rsdt->sdtHeader.Length - sizeof(rsdt->sdtHeader)) / sizeof(rsdt->sdtAddresses[0]);
     
     for(size_t i = 0; i < numEntries; i++)
     {
-        uint64_t physAddr = (useXSDT ? currentXSDT->sdtAddresses[i] : 
-            (uint64_t)currentRSDT->sdtAddresses[i]);
+        uint64_t physAddr = (useXSDT ? xsdt->sdtAddresses[i] : (uint64_t)rsdt->sdtAddresses[i]);
         
         struct ACPISDTHeader *currentTable = hhdm_physToVirt((void *)physAddr);
 

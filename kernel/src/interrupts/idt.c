@@ -1,3 +1,4 @@
+#include <drivers/serial.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <interrupts/idt.h>
@@ -23,16 +24,21 @@ void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
     currentDescriptor->offset_3 = (uintptr_t)isr >> 32;
 }
 
+// Initializes the idt table
 void idt_initialize_idtTable(void)
 {
+    // Fill the idt's 256 entries with the stub table
     for(size_t i = 0; i < IDT_NUM_ENTRIES; i++)
     {
         idt_set_descriptor(i, isr_stub_table[i], IDT_GATE_INTERRUPT_TYPE | (1 << 7));
     }
 
+    // The idtr can stay on the stack since lidt stores a copy of it
     struct idtr idtr;
     idtr.offset = (uintptr_t)idt;
     idtr.size = sizeof(idt) - 1;
     
+    // Finally load the new idt
     idt_load(&idtr);
+    log_to_serial("[DEBUG] IDT loaded\n");
 }

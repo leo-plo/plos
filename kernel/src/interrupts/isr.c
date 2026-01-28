@@ -2,6 +2,7 @@
 #include <drivers/serial.h>
 #include <cpu.h>
 
+// Main interrupt handler, each interrupt arrives here
 void interrupt_handler(struct isr_context *context)
 {
     switch (context->vector_number) {

@@ -18,13 +18,14 @@ extern struct limine_hhdm_request hhdm_request;
 // If renaming kmain() to something else, make sure to change the
 // linker script accordingly.
 void kmain(void) {
-    // Ensure the bootloader actually understands our base revision (see spec).
+    // Ensure the bootloader actually understands our base revision .
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
         hcf();
     }
 
     // Ensure we got the rsdp
-    if(rsdp_request.response == NULL)
+    if(rsdp_request.response == NULL
+     || rsdp_request.response->address == NULL)
     {
         hcf();
     }
@@ -39,14 +40,11 @@ void kmain(void) {
     if (hhdm_request.response == NULL) {
         hcf();
     }
-
-    // Fetch the first framebuffer.
-    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
-
+    
+    init_serial();
     gdt_initialize_gdtTable();
     idt_initialize_idtTable();
-
-    init_serial();
+    
     disable_pic();
 
     if(!acpi_set_correct_RSDT(rsdp_request.response->address))
@@ -55,7 +53,10 @@ void kmain(void) {
         hcf();
     }
 
-    // Note: we assume the framebuffer model is RGB with 32-bit pixels.
+    // Fetch the first framebuffer.
+    struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
+
+    // We assume the framebuffer model is RGB with 32-bit pixels.
     for (size_t i = 0; i < 100; i++) {
         volatile uint32_t *fb_ptr = framebuffer->address;
         fb_ptr[i * (framebuffer->pitch / 4) + i] = 0xffffff;

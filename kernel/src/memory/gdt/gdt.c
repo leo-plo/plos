@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <memory/gdt/gdt.h>
+#include <drivers/serial.h>
 
 // Aligned for performance
 __attribute__((aligned(0x08))) 
@@ -41,4 +42,6 @@ void gdt_initialize_gdtTable(void)
     gdtr.size = sizeof(gdt_table) - 1;
     gdtr.offset = (uint64_t) &gdt_table;
     gdt_load(&gdtr);
+
+    log_to_serial("[DEBUG] GDT loaded\n");
 }
