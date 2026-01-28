@@ -2,9 +2,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <limine.h>
-#include <hal/cpu.h>
-#include <hal/devices.h>
+#include <cpu.h>
 #include <drivers/acpi.h>
+#include <memory/gdt/gdt.h>
+#include <interrupts/idt.h>
+#include <drivers/pic.h>
+#include <drivers/serial.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -17,35 +20,39 @@ extern struct limine_hhdm_request hhdm_request;
 void kmain(void) {
     // Ensure the bootloader actually understands our base revision (see spec).
     if (LIMINE_BASE_REVISION_SUPPORTED(limine_base_revision) == false) {
-        hal_hcf();
+        hcf();
     }
 
     // Ensure we got the rsdp
     if(rsdp_request.response == NULL)
     {
-        hal_hcf();
+        hcf();
     }
 
     // Ensure we got a framebuffer.
     if (framebuffer_request.response == NULL
      || framebuffer_request.response->framebuffer_count < 1) {
-        hal_hcf();
+        hcf();
     }
 
     // Ensure we got the hhdm.
     if (hhdm_request.response == NULL) {
-        hal_hcf();
+        hcf();
     }
 
     // Fetch the first framebuffer.
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];
 
-    hal_initialize_cpu();
-    hal_initialize_devices();
+    gdt_initialize_gdtTable();
+    idt_initialize_idtTable();
+
+    init_serial();
+    disable_pic();
+
     if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {
         log_to_serial("[ERROR] The RSDP is invalid\n");
-        hal_hcf();
+        hcf();
     }
 
     // Note: we assume the framebuffer model is RGB with 32-bit pixels.
@@ -55,5 +62,5 @@ void kmain(void) {
     }
 
     // We're done, just hang...
-    hal_hcf();
+    hcf();
 }

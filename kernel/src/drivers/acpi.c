@@ -1,8 +1,8 @@
-#include <drivers/acpi.h>
-#include <memory/hhdm.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <drivers/acpi.h>
+#include <memory/hhdm.h>
 #include <libk/string.h>
 
 static bool useXSDT = false;
