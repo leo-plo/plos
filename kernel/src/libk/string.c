@@ -66,3 +66,36 @@ size_t strlen(const char *s)
         length++;
     return length;
 }
+
+int strcmp(const char *p1, const char *p2)
+{
+    register const unsigned char *s1 = (const unsigned char *) p1;
+    register const unsigned char *s2 = (const unsigned char *) p2;
+    unsigned char c1, c2;
+
+    do
+    {
+        c1 = (unsigned char) *s1++;
+        c2 = (unsigned char) *s2++;
+        if (c1 == '\0')
+            return c1 - c2;
+    } while (c1 == c2);
+
+    return c1 - c2;
+}
+
+int strncmp(const char *s1, const char *s2, register size_t n)
+{
+    register unsigned char u1, u2;
+
+    while (n-- > 0)
+    {
+        u1 = (unsigned char) *s1++;
+        u2 = (unsigned char) *s2++;
+        if (u1 != u2)
+            return u1 - u2;
+        if (u1 == '\0')
+            return 0;
+    }
+    return 0;
+}

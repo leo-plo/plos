@@ -28,12 +28,9 @@ bool acpi_set_correct_RSDT(void *rsdp_addr)
     }
 
     // Verify the signature
-    for(uint32_t i = 0; i < strlen(RSDP_SIGNATURE); i++)
+    if(strncmp(rsdp->Signature, RSDP_SIGNATURE, 8) != 0)
     {
-        if(rsdp->Signature[i] != RSDP_SIGNATURE[i])
-        {
-            return false;
-        }
+        return false;
     }
 
     useXSDT = rsdp->Revision == 2;
@@ -56,4 +53,28 @@ bool acpi_isXSDT(void)
 void *acpi_getCurrent_RSDT(void)
 {
     return useXSDT ? (void *)currentXSDT : (void *)currentRSDT; 
+}
+
+// Trova una tabella specifica (es. "APIC")
+void *acpi_find_table(const char *signature)
+{
+    size_t numEntries = useXSDT ? (currentXSDT->sdtHeader.Length - sizeof(currentXSDT->sdtHeader)) / 
+                                    sizeof(currentXSDT->sdtAddresses[0]) :
+                                  (currentRSDT->sdtHeader.Length - sizeof(currentRSDT->sdtHeader)) / 
+                                    sizeof(currentRSDT->sdtAddresses[0]) ;
+    
+    for(size_t i = 0; i < numEntries; i++)
+    {
+        uint64_t physAddr = (useXSDT ? currentXSDT->sdtAddresses[i] : 
+            (uint64_t)currentRSDT->sdtAddresses[i]);
+        
+        struct ACPISDTHeader *currentTable = hhdm_physToVirt((void *)physAddr);
+
+        if(strncmp(currentTable->Signature, signature, 4) == 0)
+        {
+            return (void *)currentTable;
+        }
+    }
+
+    return NULL;
 }
