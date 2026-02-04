@@ -39,16 +39,16 @@ static void pmm_mark_region(uint64_t physStartAddr, uint64_t length, uint8_t reg
 
     endPhysAddr = physStartAddr + length;
 
-    // If the startAddr isn't aligned we must round down
+    // If the startAddr isn't aligned we must round up
     if(physStartAddr % PMM_PAGE_SIZE)
     {
-        physStartAddr -= physStartAddr % PMM_PAGE_SIZE;
+        physStartAddr += PMM_PAGE_SIZE - (physStartAddr % PMM_PAGE_SIZE);
     }
 
-    // If the endAddr isn't aligned we must round up
+    // If the endAddr isn't aligned we must round down
     if(endPhysAddr % PMM_PAGE_SIZE)
     {
-        endPhysAddr += PMM_PAGE_SIZE - (endPhysAddr % PMM_PAGE_SIZE);
+        endPhysAddr -= endPhysAddr % PMM_PAGE_SIZE;
     }
 
     // Start freeing memory
