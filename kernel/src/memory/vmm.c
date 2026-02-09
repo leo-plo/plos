@@ -15,6 +15,9 @@ static uint64_t *kernel_pml4_phys;
 
 // We are going to implement 4 level paging with 4kb pages
 
+/*
+    This function will return the page table entry
+*/
 static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool allocate, bool is_huge)
 {
     // We align the addresses to a 4096 boundary
