@@ -14,6 +14,7 @@
 #include <libk/string.h>
 #include <common/logging.h>
 #include <limine_requests.h>
+#include <memory/hhdm.h>
 
 extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
@@ -35,16 +36,17 @@ void kmain(void) {
     
     disable_pic();
 
+    printMemmap(memmap_request.response);
     pmm_initialize(memmap_request.response);
+    pmm_dump_state();
     vmm_init();
     kheap_init();
 
-    /*if(!acpi_set_correct_RSDT(rsdp_request.response->address))
+    if(!acpi_set_correct_RSDT(rsdp_request.response->address))
     {
         log_to_serial("[ERROR] The RSDP is invalid\n");
         hcf();
     }
-    */
 
     // Fetch the first framebuffer.
     struct limine_framebuffer *framebuffer = framebuffer_request.response->framebuffers[0];

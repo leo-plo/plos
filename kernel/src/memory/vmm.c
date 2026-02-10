@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <libk/string.h>
+#include <interrupts/isr.h>
 
 extern struct limine_executable_address_request executable_addr_request;
 extern struct limine_hhdm_request hhdm_request;
@@ -137,7 +138,7 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
     }
 
     // Allocate the page tables
-    uint64_t *pte = vmm_get_pte(hhdm_physToVirt(pml4_root), virt_addr, true, isHugePage);
+    uint64_t *pte = vmm_get_pte(pml4_root, virt_addr, true, isHugePage);
     if(!pte)
     {
         log_logLine(LOG_ERROR, "%s: Cannot map new page %llx: OOP", __FUNCTION__, virt_addr);
@@ -252,4 +253,17 @@ inline void vmm_switchContext(uint64_t *kernel_pml4_phys)
 uint64_t *vmm_getKernelRoot(void)
 {
     return kernel_pml4_phys;
+}
+
+void vmm_page_fault_handler(struct isr_context *context)
+{
+    // Nel tuo Page Fault Handler (ISR 14)
+    uint64_t cr2;
+    asm volatile("mov %%cr2, %0" : "=r"(cr2));
+    uint64_t rip = context->rip; // Assumendo tu abbia l'interrupt frame
+
+    log_logLine(LOG_ERROR, "PAGE FAULT! CR2 (Addr): 0x%llx | RIP (Code): 0x%llx | Error: 0x%x", cr2, rip, context->error_code);
+
+    // Loop infinito per leggere il log
+    hcf();
 }

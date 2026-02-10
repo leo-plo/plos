@@ -9,58 +9,186 @@
 #include <memory/hhdm.h>
 #include <libk/string.h>
 #include <common/logging.h>
+#include <common/dll.h>
 
-static uint8_t *pmm_bitmap = NULL;
-static size_t pmm_bitmapSize = 0;
+// Array of all pages
+static struct pmm_page *buddy_memmap = NULL;
+static uint64_t buddy_memmap_size = 0;
+
+// Array of free lists of each order
+static struct free_area free_areas[PMM_MAX_ORDER];
+
+// Used for statistics
+static uint64_t used_pages, totalPages;
+
+// Highest usable RAM Addr
 static uint64_t highestAddr = 0;
 
-// Marks a single page in the bitmap as free or used
-static void pmm_mark_page(uint64_t physAddr, uint8_t pageType)
+/********************** UTILITY FUNCTIONS FOR BUDDY ***********************/
+
+static inline struct pmm_page *pfn_to_page(uint64_t pfn)
 {
-    uint64_t bitPos = physAddr / PMM_PAGE_SIZE;
+    if(pfn >= totalPages) return NULL;
+    return &buddy_memmap[pfn];
+}
 
-    uint64_t byteIndex = bitPos / 8;
-    uint64_t bitIndex = bitPos % 8;
+// Uses pointer arithmetic
+static inline uint64_t page_to_pfn(struct pmm_page *page) { return page - buddy_memmap; }
 
-    if(!pmm_bitmap || byteIndex >= pmm_bitmapSize) return;
+static inline uint64_t page_to_phys(struct pmm_page *page) { return page_to_pfn(page) * PMM_PAGE_SIZE; }
+
+static inline bool is_page_free(struct pmm_page *page) { return !(page->flags & PMM_FLAG_USED); }
+
+/*************************************************************************/
+
+// Frees an entire block of pages of order x: 0 = 4KB
+void pmm_free_pages(uint64_t phys, uint32_t order)
+{
+    if(phys % PMM_PAGE_SIZE)
+    {
+        log_logLine(LOG_WARN, "%s: Warning freeing unaligned address %llx", __FUNCTION__, phys);
+        return;
+    }
+
+    // Get the page we're referring to
+    uint64_t pfn = phys / PMM_PAGE_SIZE;
+    struct pmm_page *page = pfn_to_page(pfn);
+    if(!page) return;
+
+    // Coalescing buddys
+    while(order < PMM_MAX_ORDER - 1)
+    {
+        // Get the buddy page
+        uint64_t buddy_pfn = pfn ^ (1 << order);
+        struct pmm_page *buddy_page = pfn_to_page(buddy_pfn);
+        
+        // If the buddy doesn't exist or it's outside our RAM, stop
+        if(!buddy_page || buddy_pfn >= totalPages) break;
+
+        // We can merge if and only if:
+        // 1) Buddy is free
+        // 2) Buddy has the same order
+        if(!is_page_free(buddy_page) || buddy_page->order != order) break;
+
+        // We found a valid buddy to coalesce with
+
+        // Remove the buddy from his free list
+        dll_delete(&buddy_page->link);
+        free_areas[order].nr_free--;
+
+        // Cleanup
+        buddy_page->order = 0;
+
+        // If buddy comes before us we set it to be the new "manager"
+        if(buddy_pfn < pfn)
+        {
+            pfn = buddy_pfn;
+            page = buddy_page;
+        }
+
+        order++;
+    }
+
+    // We set the newly coalesced page as free
+    page->order = order;
+    page->flags = PMM_FLAG_FREE;
+    page->ref_count = 0;
+
+    // Add it to our free areas list
+    dll_add_after(&free_areas[order].head, &page->link);
+    free_areas[order].nr_free++;
+}
+
+// Allocates 2^order page. Returns the physical address
+uint64_t pmm_alloc_pages(uint32_t order)
+{
+    if(order >= PMM_MAX_ORDER) return 0;
+
+    // Search for a page >= order we search for
+    uint32_t current_order;
+    bool page_found = false;
+    for(current_order = order; current_order < PMM_MAX_ORDER; current_order++)
+    {
+        // Has this free list at least one block?
+        if(!dll_empty(&free_areas[current_order].head))
+        {
+            page_found = true;
+            break;
+        }
+    }
+
+    if(!page_found) return 0;
+
+    // Delete the node since it's not free anymore
+    struct double_ll_node *node = free_areas[current_order].head.next;
+    dll_delete(node);
+    free_areas[current_order].nr_free--;
     
-    if(pageType == PMM_PAGE_FREE)
+    // Get the page struct
+    struct pmm_page *page = (struct pmm_page *)((uint8_t *)node - offsetof(struct pmm_page, link));
+
+    // Splitting
+    // If our order is bigger we simply split it until it's of the correct size
+    while(current_order > order)
     {
-        pmm_bitmap[byteIndex] &= ~(1 << bitIndex);
+        current_order--;
+
+        // We find our buddy
+        uint64_t buddy_pfn = page_to_pfn(page) ^ (1 << current_order);
+        struct pmm_page *buddy_page = pfn_to_page(buddy_pfn);
+        
+        // We initialize the new page
+        buddy_page->order = current_order;
+        buddy_page->flags = PMM_FLAG_FREE;
+        buddy_page->ref_count = 0;
+
+        // We add it to our list of free pages
+        dll_add_after(&free_areas[current_order].head, &buddy_page->link);
+        free_areas[current_order].nr_free++;
     }
-    else 
-    {
-        pmm_bitmap[byteIndex] |= (1 << bitIndex);
-    }
+
+    page->flags = PMM_FLAG_USED;
+    page->ref_count = 1;
+    page->order = order;
+
+    return page_to_phys(page);
 }
 
-// Mark the memory region in the bitmap
-static void pmm_mark_region(uint64_t physStartAddr, uint64_t length, uint8_t regionType)
+// Convert a size (bytes) into log2(bytes)
+static uint32_t pmm_get_order_from_size(uint64_t size)
 {
-    uint64_t endPhysAddr;
+    uint64_t pages_needed = size / PMM_PAGE_SIZE;
+    if(size % PMM_PAGE_SIZE) pages_needed++;
 
-    endPhysAddr = physStartAddr + length;
-
-    // If the startAddr isn't aligned we must round up
-    if(physStartAddr % PMM_PAGE_SIZE)
-    {
-        physStartAddr += PMM_PAGE_SIZE - (physStartAddr % PMM_PAGE_SIZE);
-    }
-
-    // If the endAddr isn't aligned we must round down
-    if(endPhysAddr % PMM_PAGE_SIZE)
-    {
-        endPhysAddr -= endPhysAddr % PMM_PAGE_SIZE;
-    }
-
-    // Start freeing memory
-    for(uint64_t i = physStartAddr; i < endPhysAddr; i += PMM_PAGE_SIZE)
-    {
-        pmm_mark_page(i, regionType);
-    }
+    // We search the power of 2 
+    uint32_t order = 0;
+    while((1ULL << order) < pages_needed) order++;
+    return order;
 }
 
-// Initialize the bitmap and its size
+// Our main function for allocating physical memory
+uint64_t pmm_alloc(uint64_t size)
+{
+    uint32_t order = pmm_get_order_from_size(size);
+    if(order >= PMM_MAX_ORDER) return 0; // Too big
+
+    uint64_t phys = pmm_alloc_pages(order);
+    if(phys != 0) used_pages += (1ULL << order);
+
+    return phys;
+}
+
+// Our main function for deallocating physical memory
+void pmm_free(uint64_t physAddr, uint64_t length)
+{
+    uint32_t order = pmm_get_order_from_size(length);
+
+    pmm_free_pages(physAddr, order);
+
+    used_pages -= (1ULL << order);
+}
+
+// Initialize the buddy allocator
 void pmm_initialize(struct limine_memmap_response *memmap)
 {
     // Find the highest usable RAM address
@@ -81,113 +209,132 @@ void pmm_initialize(struct limine_memmap_response *memmap)
         }
     }
 
-    // The size of our bitmap, each bit will cointain info for one physical page
-    size_t totalPages = highestAddr / PMM_PAGE_SIZE;
-    pmm_bitmapSize = totalPages / 8;
-    if(totalPages % 8) pmm_bitmapSize++;
+    // The number of pages of usable RAM
+    totalPages = highestAddr / PMM_PAGE_SIZE;
+    if(highestAddr % PMM_PAGE_SIZE) totalPages++;
 
-    // Find the first usable slot to store our bitmap
+    // Calculate the size needed to host our structs
+    buddy_memmap_size = totalPages * sizeof(struct pmm_page);
+
+    log_logLine(LOG_DEBUG, "%s: highest addr: 0x%llx; Total pages: 0x%llu; buddy_memmap_size: 0x%llx bytes", __FUNCTION__,highestAddr, totalPages, buddy_memmap_size);
+
+    // Find the first usable region to store our memmap
     for(size_t i = 0; i < memmap->entry_count; i++)
     {
         struct limine_memmap_entry *entry = memmap->entries[i];
-        if(entry->type == LIMINE_MEMMAP_USABLE && pmm_bitmap == NULL && entry->length >= pmm_bitmapSize)
+        if(entry->type == LIMINE_MEMMAP_USABLE && entry->length >= buddy_memmap_size)
         {
             // We convert the physical address to a virtual one
-            pmm_bitmap = hhdm_physToVirt((void *)entry->base);
+            buddy_memmap = hhdm_physToVirt((void *)entry->base);
             
             // Reduce the region
-            entry->base += pmm_bitmapSize;
-            entry->length -= pmm_bitmapSize;
+            entry->base += buddy_memmap_size;
+            entry->length -= buddy_memmap_size;
             
-            // Initialize the bitmap as full
-            memset(pmm_bitmap, 0xFF, pmm_bitmapSize);
-
+            // Zero the memmap
+            memset(buddy_memmap, 0, buddy_memmap_size);
             break;
         }
     }
 
     // If no region is found we abort
-    if(!pmm_bitmap)
+    if(!buddy_memmap)
     {
-        log_logLine(LOG_ERROR, "%s, Not enough memory for bitmap", __FUNCTION__);
+        log_logLine(LOG_ERROR, "%s, Not enough memory for buddy allocator structures", __FUNCTION__);
         hcf();
     }
 
-    // Fill the bitmap with usable regions
+    // Initialize the free lists
+    for(size_t i = 0; i < PMM_MAX_ORDER; i++)
+    {
+        // Initializes the double linked lists as empty
+        dll_init(&free_areas[i].head);
+        free_areas[i].nr_free = 0;
+    }
+
+    // Fill the memmap as used
+    // Note that we memset'd to 0 the entire memmap before so order and link = 0
+    used_pages = totalPages;
+    for(uint64_t i = 0; i < totalPages; i++)
+    {
+        buddy_memmap[i].flags |= PMM_FLAG_USED;
+        buddy_memmap[i].ref_count = 1;
+    }
+
+    // Populate the buddy structs with valid entries
     for(size_t i = 0; i < memmap->entry_count; i++)
     {
         struct limine_memmap_entry *entry = memmap->entries[i];
         if(entry->type == LIMINE_MEMMAP_USABLE)
         {
-            pmm_mark_region(entry->base, entry->length, PMM_PAGE_FREE);
-        }
-    }
-
-    log_logLine(LOG_SUCCESS, "%s: PMM initialized: Bitmap size %lu bytes - Bitmap start virt addr 0x%lx", __FUNCTION__, pmm_bitmapSize, pmm_bitmap);
-}
-
-// Allocates new memory and returns a physical address to the start of it
-uint64_t pmm_alloc(uint64_t size)
-{
-    uint64_t currentSize, startingBit, length;
-    bool sequenceStarted;
-
-    currentSize = startingBit = length = 0;
-    sequenceStarted = false;
-
-    for(size_t i = 0; i < pmm_bitmapSize; i++)
-    {
-        // We first check if the entire byte is occupied
-        if(pmm_bitmap[i] == 0xFF)
-        {
-            currentSize = startingBit = length = 0;
-            sequenceStarted = false;
+            uint64_t start = entry->base;
+            uint64_t end = start + entry->length;
             
-            // If so we simply skip it
-            continue;
-        }
+            // Round up to the next page
+            if(start % PMM_PAGE_SIZE) start += PMM_PAGE_SIZE - (start % PMM_PAGE_SIZE);
+            
+            // Round down to the previous page
+            if(end % PMM_PAGE_SIZE) end -= end % PMM_PAGE_SIZE;
 
-        for(size_t j = 0; j < 8; j++)
-        {
-            // If the j-th bit is set then the page is free
-            if(!(pmm_bitmap[i] & (1 << j)))
+            uint64_t current_phys = start;
+            
+            while(current_phys < end)
             {
-                if(!sequenceStarted)
+                uint32_t order = PMM_MAX_ORDER - 1;
+                
+                // Find the biggest order to free blocks
+                while(order > 0)
                 {
-                    sequenceStarted = true;
-                    startingBit = i * 8 + j;
-                    length = 0;
+                    uint64_t size = PMM_PAGE_SIZE * (1ULL << order);
+                    
+                    // Is the address aligned ?
+                    // Is the block small enough to fit in our range?
+                    if ((current_phys & (size - 1)) == 0 && (current_phys + size) <= end)
+                    {
+                        break; // Then we found a big enough block
+                    }
+                    order--; // Otherwise try it again with a lower order 
                 }
-                length += PMM_PAGE_SIZE;
-                currentSize += PMM_PAGE_SIZE;
-            }
-            else 
-            {
-                currentSize = startingBit = length = 0;
-                sequenceStarted = false;
-            }
-
-            // We found a region
-            if(currentSize >= size)
-            {
-                // We mark the region as occupied
-                pmm_mark_region(startingBit * PMM_PAGE_SIZE, length, PMM_PAGE_OCCUPIED);
-
-                return startingBit * PMM_PAGE_SIZE;
+                
+                // Free the block
+                pmm_free_pages(current_phys, order);
+                
+                used_pages -= (1ULL << order);
+                current_phys += (PMM_PAGE_SIZE * (1ULL << order));
             }
         }
     }
 
-    // If we can't find a big enough region we return NULL
-    return (uint64_t) NULL;
+    log_logLine(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
 }
 
-// Free a memory region
-void pmm_free(uint64_t physStartAddr, uint64_t length)
+// Prints the state of our buddy allocator, nicely formatted
+void pmm_dump_state(void)
 {
-    pmm_mark_region(physStartAddr, length, PMM_PAGE_FREE);
+    log_logLine(LOG_DEBUG, "--- BUDDY ALLOCATOR STATE ---");
+
+    for (int i = 0; i < PMM_MAX_ORDER; i++)
+    {
+        if (free_areas[i].nr_free > 0)
+        {
+            uint64_t block_size = (1ULL << i) * PMM_PAGE_SIZE;
+            
+            log_logLine(LOG_DEBUG, "Order %d (%llu KB): %llu blocks free", 
+                        i, 
+                        block_size / 1024, 
+                        free_areas[i].nr_free);
+            
+        }
+    }
+
+    log_logLine(LOG_DEBUG, "-----------------------------");
+    log_logLine(LOG_DEBUG, "Total Memory: %llu MB", (totalPages * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_logLine(LOG_DEBUG, "Used Memory:  %llu MB", (used_pages * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_logLine(LOG_DEBUG, "Free Memory:  %llu MB", ((totalPages - used_pages) * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_logLine(LOG_DEBUG, "-----------------------------");
 }
 
+// Returns the highest RAM address
 uint64_t pmm_getHighestAddr(void)
 {
     return highestAddr;

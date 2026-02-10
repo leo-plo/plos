@@ -1,17 +1,17 @@
+#include <common/logging.h>
+#include <memory/vmm.h>
 #include <interrupts/isr.h>
-#include <drivers/serial.h>
 #include <cpu.h>
 
 // Main interrupt handler, each interrupt arrives here
 void interrupt_handler(struct isr_context *context)
 {
-    switch (context->vector_number) {
-        case 0:
-            log_to_serial("[DEBUG] Divide by 0 interrupt\n");
-            hcf();
-            break;
-        default:
-            log_to_serial("[DEBUG] Interrupt fired\n");
-            break;
+    log_logLine(LOG_DEBUG, "Interrupt fired: 0x%llx error code: 0x%llx", context->vector_number, context->error_code);
+    switch(context->vector_number)
+    {
+        // Page fault
+        case 14:
+            vmm_page_fault_handler(context);
+        break;
     }
 }

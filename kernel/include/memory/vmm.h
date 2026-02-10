@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <interrupts/isr.h>
 
 #define VMM_PAGE_SIZE       4096
 #define VMM_HUGE_PAGE_SIZE  0x200000
@@ -32,6 +33,7 @@
 void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage);
 void vmm_init(void);
 inline void vmm_switchContext(uint64_t *kernel_pml4_phys);
+void vmm_page_fault_handler(struct isr_context *context);
 uint64_t *vmm_getKernelRoot(void);
 
 #endif // VMM_H
