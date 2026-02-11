@@ -16,7 +16,7 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
 void *memset(void *s, int c, size_t n) {
     uint8_t *p = (uint8_t *)s;
     
-    // 1. Se stiamo scrivendo pochi byte, non vale la pena ottimizzare
+    // If writing < 8 byte
     if (n < 8) {
         while (n--) {
             *p++ = (uint8_t)c;
@@ -24,29 +24,25 @@ void *memset(void *s, int c, size_t n) {
         return s;
     }
 
-    // 2. Allineamento a 8 byte
-    // Scriviamo byte singoli finché l'indirizzo 'p' non è divisibile per 8
+    // Write single bytes until the address is divisible by 8
     while ((uintptr_t)p & 0x7) {
         *p++ = (uint8_t)c;
         n--;
     }
 
-    // 3. Preparazione del pattern a 64 bit
-    // Se c = 0xAB, vogliamo che val64 sia 0xABABABABABABABAB
     uint64_t val64 = (uint8_t)c;
     val64 |= val64 << 8;
     val64 |= val64 << 16;
     val64 |= val64 << 32;
 
-    // 4. Scrittura veloce (8 byte alla volta)
+    // Write 8 bytes at a time
     uint64_t *p64 = (uint64_t *)p;
     while (n >= 8) {
         *p64++ = val64;
         n -= 8;
     }
 
-    // 5. Tail (Coda)
-    // Scriviamo i byte rimanenti (sono sicuramente meno di 8)
+    // Write the remaining bytes (< 8)
     p = (uint8_t *)p64;
     while (n--) {
         *p++ = (uint8_t)c;

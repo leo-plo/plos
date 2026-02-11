@@ -5,6 +5,8 @@
 #include <memory/hhdm.h>
 #include <libk/string.h>
 
+extern struct limine_rsdp_request rsdp_request;
+
 static bool useXSDT = false;
 static void* currentRSDT = NULL;
 
@@ -17,10 +19,9 @@ static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
 }
 
 // Returns true if the rdsp is initialized correctly
-// Side effect: Sets the useXSDT global variable to the correct value
-bool acpi_set_correct_RSDT(void *rsdp_addr)
+bool acpi_set_correct_RSDT()
 {
-    struct RSDPDescriptorV2 *rsdp = rsdp_addr;
+    struct RSDPDescriptorV2 *rsdp = rsdp_request.response->address;
     if(!rsdp)
     {
         return false;

@@ -47,11 +47,3 @@ void write_serial(char a) {
 
     outb(PORT,a);
 }
-
-// Prints a string to the serial output
-void log_to_serial(char *string) {
-    for(uint32_t i = 0; string[i] != '\0'; i++)
-    {
-        write_serial(string[i]);
-    }
-}

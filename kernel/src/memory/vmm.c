@@ -16,9 +16,7 @@ static uint64_t *kernel_pml4_phys;
 
 // We are going to implement 4 level paging with 4kb pages
 
-/*
-    This function will return the page table entry
-*/
+//This function will return the page table entry
 static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool allocate, bool is_huge)
 {
     // We align the addresses to a 4096 boundary
@@ -206,7 +204,7 @@ void vmm_init(void)
         uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
         vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
     }
-    log_logLine(LOG_DEBUG, "%s: Code segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+    log_logLine(LOG_DEBUG, "%s: Rodata mapped\n\tvirtual range: 0x%llx - 0x%llx", 
         __FUNCTION__, &_RODATA_START, &_RODATA_END);
 
     // Map the data segment (Read + Write)
@@ -216,7 +214,7 @@ void vmm_init(void)
         uint64_t offset = virtual - (uint64_t) &_KERNEL_START;
         vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, k_phys + offset, pte_flags, false);
     }
-    log_logLine(LOG_DEBUG, "%s: Code segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
+    log_logLine(LOG_DEBUG, "%s: data segment mapped\n\tvirtual range: 0x%llx - 0x%llx", 
         __FUNCTION__, &_DATA_START, &_DATA_END);
 
     // ************ HHDM mapping ****************
@@ -245,6 +243,7 @@ void vmm_init(void)
     log_logLine(LOG_SUCCESS, "%s: Switched to kernel pml4.", __FUNCTION__);
 }
 
+// Switches the page table root by updating the cr3 register
 inline void vmm_switchContext(uint64_t *kernel_pml4_phys)
 {
     asm volatile("mov %0, %%cr3" :: "r"(kernel_pml4_phys) : "memory");
@@ -257,13 +256,11 @@ uint64_t *vmm_getKernelRoot(void)
 
 void vmm_page_fault_handler(struct isr_context *context)
 {
-    // Nel tuo Page Fault Handler (ISR 14)
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2));
-    uint64_t rip = context->rip; // Assumendo tu abbia l'interrupt frame
+    uint64_t rip = context->rip;
 
     log_logLine(LOG_ERROR, "PAGE FAULT! CR2 (Addr): 0x%llx | RIP (Code): 0x%llx | Error: 0x%x", cr2, rip, context->error_code);
 
-    // Loop infinito per leggere il log
     hcf();
 }

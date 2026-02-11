@@ -11,6 +11,8 @@
 #include <common/logging.h>
 #include <common/dll.h>
 
+extern struct limine_memmap_request memmap_request;
+
 // Array of all pages
 static struct pmm_page *buddy_memmap = NULL;
 static uint64_t buddy_memmap_size = 0;
@@ -36,6 +38,8 @@ static inline struct pmm_page *pfn_to_page(uint64_t pfn)
 static inline uint64_t page_to_pfn(struct pmm_page *page) { return page - buddy_memmap; }
 
 static inline uint64_t page_to_phys(struct pmm_page *page) { return page_to_pfn(page) * PMM_PAGE_SIZE; }
+
+static inline struct pmm_page *phys_to_page(uint64_t phys) { return pfn_to_page(phys/PMM_PAGE_SIZE); }
 
 static inline bool is_page_free(struct pmm_page *page) { return !(page->flags & PMM_FLAG_USED); }
 
@@ -189,8 +193,10 @@ void pmm_free(uint64_t physAddr, uint64_t length)
 }
 
 // Initialize the buddy allocator
-void pmm_initialize(struct limine_memmap_response *memmap)
+void pmm_initialize()
 {
+    struct limine_memmap_response *memmap = memmap_request.response;
+
     // Find the highest usable RAM address
     for(size_t i = 0; i < memmap->entry_count; i++)
     {
@@ -308,6 +314,30 @@ void pmm_initialize(struct limine_memmap_response *memmap)
     log_logLine(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
 }
 
+// Increment the reference count on the page
+void pmm_page_inc_ref(uint64_t phys)
+{
+    struct pmm_page *page = phys_to_page(phys);
+    
+    if(page && (page->flags & PMM_FLAG_USED))
+        page->ref_count++;
+}
+
+// Decrements the reference count on the page, if it reaches zero it also frees it
+void pmm_page_dec_ref(uint64_t phys)
+{
+    struct pmm_page *page = phys_to_page(phys);
+    if(page && (page->flags & PMM_FLAG_USED))
+    {
+        page->ref_count--;
+        if(page->ref_count == 0)
+        {
+            pmm_free_pages(phys, page->order);
+            used_pages--;
+        }
+    }
+}
+
 // Prints the state of our buddy allocator, nicely formatted
 void pmm_dump_state(void)
 {
@@ -319,10 +349,7 @@ void pmm_dump_state(void)
         {
             uint64_t block_size = (1ULL << i) * PMM_PAGE_SIZE;
             
-            log_logLine(LOG_DEBUG, "Order %d (%llu KB): %llu blocks free", 
-                        i, 
-                        block_size / 1024, 
-                        free_areas[i].nr_free);
+            log_logLine(LOG_DEBUG, "Order %d (%llu KB): %llu blocks free", i, block_size / 1024, free_areas[i].nr_free);
             
         }
     }
@@ -332,6 +359,22 @@ void pmm_dump_state(void)
     log_logLine(LOG_DEBUG, "Used Memory:  %llu MB", (used_pages * PMM_PAGE_SIZE) / 1024 / 1024);
     log_logLine(LOG_DEBUG, "Free Memory:  %llu MB", ((totalPages - used_pages) * PMM_PAGE_SIZE) / 1024 / 1024);
     log_logLine(LOG_DEBUG, "-----------------------------");
+}
+
+// Print the usable physical regions
+void pmm_printUsableRegions()
+{
+    struct limine_memmap_response *memmap = memmap_request.response;
+
+    log_logLine(LOG_DEBUG, "%s: Printing system memory map: ", __FUNCTION__);
+    for(size_t i = 0; i < memmap->entry_count; i++)
+    {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if(entry->type == LIMINE_MEMMAP_USABLE)
+        {
+            log_logLine(LOG_DEBUG, "%d) Usable region; Phys range: 0x%llx - 0x%llx; Length: %llu bytes", i+1, entry->base, entry->base + entry->length, entry->length);
+        }
+    }
 }
 
 // Returns the highest RAM address

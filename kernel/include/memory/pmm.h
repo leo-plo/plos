@@ -1,7 +1,6 @@
 #ifndef PMM_H
 #define PMM_H
 
-#include <limine.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <common/dll.h>
@@ -26,10 +25,11 @@ struct free_area {
     uint64_t nr_free; // How many free blocks do we have
 };
 
-void pmm_initialize(struct limine_memmap_response *memmap);
+void pmm_initialize();
 uint64_t pmm_alloc(uint64_t size);
 void pmm_free(uint64_t physAddr, uint64_t length);
 uint64_t pmm_getHighestAddr(void);
 void pmm_dump_state(void);
+void pmm_printUsableRegions();
 
 #endif // PMM_H

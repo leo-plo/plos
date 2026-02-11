@@ -16,35 +16,30 @@
 #include <limine_requests.h>
 #include <memory/hhdm.h>
 
-extern uint64_t limine_base_revision[];
 extern struct limine_framebuffer_request framebuffer_request;
-extern struct limine_rsdp_request rsdp_request;
-extern struct limine_hhdm_request hhdm_request;
-extern struct limine_memmap_request memmap_request;
 
-// The following will be our kernel's entry point.
-// If renaming kmain() to something else, make sure to change the
-// linker script accordingly.
+// This is our kernel's entry point.
 void kmain(void) {
 
     limine_verify_requests();
 
     init_serial();
     log_init(LOG_SERIAL);
+    
     gdt_initialize_gdtTable();
     idt_initialize_idtTable();
     
     disable_pic();
 
-    printMemmap(memmap_request.response);
-    pmm_initialize(memmap_request.response);
+    pmm_printUsableRegions();
+    pmm_initialize();
     pmm_dump_state();
     vmm_init();
     kheap_init();
 
-    if(!acpi_set_correct_RSDT(rsdp_request.response->address))
+    if(!acpi_set_correct_RSDT())
     {
-        log_to_serial("[ERROR] The RSDP is invalid\n");
+        log_logLine(LOG_ERROR, "Error, cannot initialize RSDT");
         hcf();
     }
 
