@@ -109,24 +109,12 @@ static uint64_t* vmm_get_pte(uint64_t *pml4_root, uint64_t virt_addr, bool alloc
 */
 void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage)
 {
-    if(isHugePage)
-    {
-        // We align the addresses to a 2MB boundary
-        if(virt_addr % VMM_HUGE_PAGE_SIZE)
-            virt_addr -= virt_addr % VMM_HUGE_PAGE_SIZE;
-
-        if(phys_addr % VMM_HUGE_PAGE_SIZE)
-            phys_addr -= phys_addr % VMM_HUGE_PAGE_SIZE;
-    }
-    else 
-    {
-        // We align the addresses to a 4096 boundary
-        if(virt_addr % VMM_PAGE_SIZE)
-            virt_addr -= virt_addr % VMM_PAGE_SIZE;
-
-        if(phys_addr % PMM_PAGE_SIZE)
-            phys_addr -= phys_addr % PMM_PAGE_SIZE;
-    }
+    // We align the addresses to a 2MB boundary
+    if(isHugePage && phys_addr % VMM_HUGE_PAGE_SIZE)
+        phys_addr -= phys_addr % VMM_HUGE_PAGE_SIZE;
+    // We align the addresses to a 4KB boundary
+    else if(phys_addr % VMM_PAGE_SIZE)
+        phys_addr -= phys_addr % PMM_PAGE_SIZE;
     
     // The root MUST point to a valid address and we won't map to page zero
     if(!pml4_root || !virt_addr)
@@ -148,6 +136,28 @@ void vmm_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, u
 
     // Invalidate the corresponding tlb entry
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
+}
+
+// Unmaps a page from the virtual address space
+void vmm_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
+{
+    if(!pml4_root || !virt_addr)
+    {
+        log_logLine(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        hcf();
+    }
+
+    uint64_t *pte = vmm_get_pte(pml4_root, virt_addr, false, isHugePage);
+    if(!pte) return; // It's already unmapped
+
+    uint64_t physAddr = *pte & VMM_PTE_ADDR_MASK;
+    *pte = 0; // We zero the pte
+
+    // Invalidate the tlb entry
+    asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
+
+    // Decrement the number of references to the physical page
+    pmm_page_dec_ref(physAddr);    
 }
 
 // This function should be called at the start to initialize the vmm

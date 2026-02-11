@@ -29,6 +29,8 @@ void pmm_initialize();
 uint64_t pmm_alloc(uint64_t size);
 void pmm_free(uint64_t physAddr, uint64_t length);
 uint64_t pmm_getHighestAddr(void);
+void pmm_page_inc_ref(uint64_t phys);
+void pmm_page_dec_ref(uint64_t phys);
 void pmm_dump_state(void);
 void pmm_printUsableRegions();
 
