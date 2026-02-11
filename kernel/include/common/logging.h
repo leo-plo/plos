@@ -14,6 +14,6 @@ enum logOutput {
 };
 
 void log_init(enum logOutput out);
-void log_logLine(enum logType logLevel, char *fmt, ...);
+void log_log_line(enum logType logLevel, char *fmt, ...);
 
 #endif // LOGGING_H

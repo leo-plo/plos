@@ -13,6 +13,6 @@
 #define ICW_3_S     0x2
 #define ICW4_8086	0x01	
 
-void disable_pic(void);
+void pic_disable(void);
 
 #endif // PIC_H

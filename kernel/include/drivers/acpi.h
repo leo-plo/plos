@@ -52,7 +52,7 @@ struct XSDT {
 
 bool acpi_set_correct_RSDT();
 bool acpi_isXSDT(void);
-void *acpi_getCurrent_RSDT(void);
+void *acpi_get_current_RSDT(void);
 void *acpi_find_table(const char *signature);
 
 #endif // ACPI_H

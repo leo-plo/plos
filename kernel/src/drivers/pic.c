@@ -1,7 +1,7 @@
 #include <drivers/pic.h>
 #include <drivers/portsIO.h>
 
-void disable_pic(void) {
+void pic_disable(void) {
     // PIC Initialization
     outb(PIC_COMMAND_MASTER, ICW_1);
     outb(PIC_COMMAND_SLAVE, ICW_1);

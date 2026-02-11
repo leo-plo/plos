@@ -48,7 +48,7 @@ bool acpi_isXSDT(void)
 }
 
 // Returns the local table
-void *acpi_getCurrent_RSDT(void)
+void *acpi_get_current_RSDT(void)
 {
     return currentRSDT; 
 }

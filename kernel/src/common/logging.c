@@ -20,7 +20,7 @@ void log_init(enum logOutput out)
     outputType = out;
 }
 
-void log_logLine(enum logType logLevel, char *fmt, ...)
+void log_log_line(enum logType logLevel, char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);

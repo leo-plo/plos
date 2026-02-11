@@ -3,7 +3,7 @@
 #include <memory/hhdm.h>
 #include <memory/kheap.h>
 #include <memory/pmm.h>
-#include <memory/vmm.h>
+#include <memory/paging.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,9 +22,9 @@ void kheap_init(void)
     kheap_start = (uint64_t)&_KERNEL_END + 0x100000;
     
     // Align it to the next virtual page
-    if(kheap_start % VMM_PAGE_SIZE)
+    if(kheap_start % PAGING_PAGE_SIZE)
     {
-        kheap_start += VMM_PAGE_SIZE - (kheap_start % VMM_PAGE_SIZE);
+        kheap_start += PAGING_PAGE_SIZE - (kheap_start % PAGING_PAGE_SIZE);
     }
 
     // We set the end at the start since it's empty
@@ -33,30 +33,30 @@ void kheap_init(void)
     // We map the initial memory region of the heap
     kheap_extend(KHEAP_STARTING_SIZE);
 
-    log_logLine(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
+    log_log_line(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
 }
 
 // Extends our kernel heap
 bool kheap_extend(size_t size)
 {
     // Calculate the number of pages
-    uint64_t numPages = size / VMM_PAGE_SIZE;
-    if(size % VMM_PAGE_SIZE) numPages++;
+    uint64_t numPages = size / PAGING_PAGE_SIZE;
+    if(size % PAGING_PAGE_SIZE) numPages++;
 
-    uint64_t *kernel_pml4_phys = vmm_getKernelRoot();
+    uint64_t *kernel_pml4_phys = paging_getKernelRoot();
     
     // Start the mapping
-    for(uint64_t virtual = kheap_end; virtual < kheap_end + (numPages * VMM_PAGE_SIZE); virtual += VMM_PAGE_SIZE)
+    for(uint64_t virtual = kheap_end; virtual < kheap_end + (numPages * PAGING_PAGE_SIZE); virtual += PAGING_PAGE_SIZE)
     {
         // Allocate a new page
-        uint64_t newPage = pmm_alloc(VMM_PAGE_SIZE);
+        uint64_t newPage = pmm_alloc(PAGING_PAGE_SIZE);
         if(!newPage)
         {
             // No more space in the pmm
             return false;
         }
         // Map the page
-        vmm_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, newPage, PTE_FLAG_RW | PTE_FLAG_GLOBAL, false);
+        paging_map_page(hhdm_physToVirt(kernel_pml4_phys), virtual, newPage, PTE_FLAG_RW | PTE_FLAG_GLOBAL, false);
     }
 
     // Get the last node
@@ -71,7 +71,7 @@ bool kheap_extend(size_t size)
     {
         struct kheap_node *newNode = (struct kheap_node *) kheap_end;
         newNode->isFree = true;
-        newNode->size = numPages * VMM_PAGE_SIZE - sizeof(struct kheap_node);
+        newNode->size = numPages * PAGING_PAGE_SIZE - sizeof(struct kheap_node);
         newNode->next = NULL;
 
         if(current == NULL)
@@ -87,12 +87,12 @@ bool kheap_extend(size_t size)
     }
     else // The last node is free so we simply augment it's size
     {
-        current->size += numPages * VMM_PAGE_SIZE;
+        current->size += numPages * PAGING_PAGE_SIZE;
     }
 
-    kheap_end += numPages * VMM_PAGE_SIZE;
+    kheap_end += numPages * PAGING_PAGE_SIZE;
 
-    log_logLine(LOG_DEBUG, "%s: The heap has been expanded by %llu bytes; new kheap_end = %llx",__FUNCTION__, numPages * VMM_PAGE_SIZE, kheap_end);
+    log_log_line(LOG_DEBUG, "%s: The heap has been expanded by %llu bytes; new kheap_end = %llx",__FUNCTION__, numPages * PAGING_PAGE_SIZE, kheap_end);
     return true;
 }
 

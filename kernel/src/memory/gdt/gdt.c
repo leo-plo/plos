@@ -44,5 +44,5 @@ void gdt_initialize_gdtTable(void)
     gdtr.offset = (uint64_t) &gdt_table;
     gdt_load(&gdtr);
 
-    log_logLine(LOG_SUCCESS, "%s: GDT initialized", __FUNCTION__);
+    log_log_line(LOG_SUCCESS, "%s: GDT initialized", __FUNCTION__);
 }

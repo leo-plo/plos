@@ -1,5 +1,5 @@
 #include <memory/kheap.h>
-#include <memory/vmm.h>
+#include <memory/paging.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -29,17 +29,17 @@ void kmain(void) {
     gdt_initialize_gdtTable();
     idt_initialize_idtTable();
     
-    disable_pic();
+    pic_disable();
 
     pmm_printUsableRegions();
     pmm_initialize();
     pmm_dump_state();
-    vmm_init();
+    paging_init();
     kheap_init();
 
     if(!acpi_set_correct_RSDT())
     {
-        log_logLine(LOG_ERROR, "Error, cannot initialize RSDT");
+        log_log_line(LOG_ERROR, "Error, cannot initialize RSDT");
         hcf();
     }
 
