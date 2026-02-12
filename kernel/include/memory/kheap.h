@@ -15,7 +15,7 @@
 struct kheap_node
 {
     // The size of the region EXCLUDING its header size
-    uint32_t size;
+    uint64_t size;
     bool isFree;
     struct kheap_node *next;
 };
@@ -24,5 +24,6 @@ void kheap_init(void);
 bool kheap_extend(size_t size);
 void* kmalloc(size_t size);
 void kfree(void *ptr);
+void kheap_print_nodes();
 
 #endif // KHEAP_H

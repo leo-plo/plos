@@ -282,6 +282,12 @@ void pmm_initialize()
             // Round down to the previous page
             if(end % PMM_PAGE_SIZE) end -= end % PMM_PAGE_SIZE;
 
+            // We sacrifice page 0 as we use that to mark invalid allocations
+            if(start == 0)
+            {
+                start += PMM_PAGE_SIZE;
+            }
+
             uint64_t current_phys = start;
             
             while(current_phys < end)

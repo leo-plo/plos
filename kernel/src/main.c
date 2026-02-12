@@ -37,6 +37,13 @@ void kmain(void) {
     paging_init();
     kheap_init();
 
+    kheap_print_nodes();
+
+    kmalloc(0x300000);
+
+    kheap_print_nodes();
+    pmm_dump_state();
+
     if(!acpi_set_correct_RSDT())
     {
         log_log_line(LOG_ERROR, "Error, cannot initialize RSDT");

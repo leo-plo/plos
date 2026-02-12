@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// This is a basic implementation of a free list allocator
+// This is a basic implementation of a linked list allocator 
 
 static uint64_t kheap_start, kheap_end;
 struct kheap_node *kheap_head;
@@ -100,6 +100,7 @@ bool kheap_extend(size_t size)
     Our kernel heap allocating function
     It allocates a virtually contiguos memory region 
     above the mapping of the kernel
+    not guaranteed to be physically contiguos
 */
 void* kmalloc(size_t size)
 {
@@ -112,15 +113,20 @@ void* kmalloc(size_t size)
     {
         currentNode = kheap_head;
 
+        log_log_line(LOG_DEBUG, "a");
+
         // Iterate the list of free nodes
         while(currentNode != NULL)
         {
+            log_log_line(LOG_DEBUG, "b");
             // We found a free and big enough block
             if(currentNode->isFree && currentNode->size >= size)
             {
+                log_log_line(LOG_DEBUG, "c");
                 // If the remaining size is enough for another big enough block we split it
                 if(currentNode->size - size >= sizeof(struct kheap_node) + KHEAP_MIN_SPLITTING_SIZE)
                 {
+                    log_log_line(LOG_DEBUG, "d");
                     struct kheap_node *newNode = (struct kheap_node *)((uint8_t *)currentNode + sizeof(struct kheap_node) + size);
                 
                     // Change the next node for both nodes
@@ -128,37 +134,52 @@ void* kmalloc(size_t size)
                     currentNode->next = newNode;
 
                     // Set the new node as free and the old one as occupied
-                    newNode->isFree = true;
-                    currentNode->isFree = false;
+                    newNode->isFree = true;               
 
                     // Set both sizes accordingly
                     newNode->size = currentNode->size - size - sizeof(struct kheap_node);
                     currentNode->size = size;
+                }
 
-                    // Return the usable address
-                    return (void *)(currentNode + 1); 
-                }
-                else 
-                {
-                    // Else we just allocate it 
-                    currentNode->isFree = false;
-                    return (void *)(currentNode + 1);
-                }
+                log_log_line(LOG_DEBUG, "e");
+                currentNode->isFree = false;
+                return (void *)(currentNode + 1);
             }
 
+            log_log_line(LOG_DEBUG, "f");
             // We go to the next node
             currentNode = currentNode->next;
         }
 
+        log_log_line(LOG_DEBUG, "g");
         // If we're here it's because we didn't find a big enough block
         if(!kheap_extend(KHEAP_EXTENDING_AMOUNT))
         {
+            log_log_line(LOG_DEBUG, "h");
             // The heap expansion has failed
             return NULL;
         }
     }
 }
 
+void kheap_print_nodes()
+{
+    log_log_line(LOG_DEBUG, "%s: Kernel heap current nodes:", __FUNCTION__);
+    struct kheap_node *current = kheap_head;
+    while(current)
+    {
+        log_log_line(LOG_DEBUG, "Region: 0x%llx - 0x%llx; isFree: %s; size: %lld bytes", 
+            (uint64_t)current + sizeof(struct kheap_node), 
+            (uint64_t)current + sizeof(struct kheap_node) + current->size,
+            current->isFree ? "true" : "false", 
+            current->size);
+        current = current->next;
+    }
+}
+
+/* 
+    Our kernel heap deallocator function
+*/
 void kfree(void *ptr)
 {
     

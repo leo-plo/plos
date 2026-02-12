@@ -114,7 +114,7 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
         phys_addr -= phys_addr % PAGING_HUGE_PAGE_SIZE;
     // We align the addresses to a 4KB boundary
     else if(phys_addr % PAGING_PAGE_SIZE)
-        phys_addr -= phys_addr % PMM_PAGE_SIZE;
+        phys_addr -= phys_addr % PAGING_PAGE_SIZE;
     
     // The root MUST point to a valid address and we won't map to page zero
     if(!pml4_root || !virt_addr)
@@ -158,6 +158,26 @@ void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
 
     // Decrement the number of references to the physical page
     pmm_page_dec_ref(physAddr);    
+}
+
+// This function changes the flags of the corresponding pte
+// only if the page is marked present
+void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t flags, bool isHugePage)
+{
+    if(!pml4_root || !virt_addr)
+    {
+        log_log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        hcf();
+    }
+
+    uint64_t *pte = vmm_get_pte(pml4_root, virt_addr, false, isHugePage);
+    if(!pte) return; // If it's not present we return
+
+    // substitute the flags
+    *pte = (*pte & PAGING_PTE_ADDR_MASK) | PTE_FLAG_PRESENT | flags;
+
+    // Invalidate the tlb entry
+    asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
 }
 
 // This function maps a physically contiguos region into a virtually contiguos region

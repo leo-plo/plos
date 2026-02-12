@@ -34,6 +34,7 @@ void paging_init(void);
 void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage);
 void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t size, uint64_t flags, bool isHugePage);
 void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage);
+void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t flags, bool isHugePage);
 inline void paging_switch_context(uint64_t *kernel_pml4_phys);
 uint64_t *paging_getKernelRoot(void);
 
