@@ -39,8 +39,8 @@ debug-x86_64: edk2-ovmf $(IMAGE_NAME).iso
 		-s -S\
 		$(QEMUFLAGS)
 
-.PHONY: documentation
-documentation: $(IMAGE_NAME).iso
+.PHONY: docs
+docs: $(IMAGE_NAME).iso
 	doxygen
 
 edk2-ovmf:

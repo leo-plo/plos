@@ -10,10 +10,14 @@
 #include <stdint.h>
 #include <libk/string.h>
 
-// The kernel address space
-static struct vm_address_space *kernel_vas = NULL;
-static struct vm_address_space *current_vas = NULL;
+// The kernel and the current virrtual address space
+static struct vm_address_space *kernel_vas = NULL, *current_vas = NULL;
 
+/**
+ * @brief Our virtual memory manager initialization function
+ * 1) Creates the kernel VAS
+ * 2) Set it to be the current VAS
+ */
 void vmm_init(void)
 {
     // Allocate space for our struct
@@ -34,7 +38,12 @@ void vmm_init(void)
     log_log_line(LOG_SUCCESS, "%s: Virtual memory manager initialized", __FUNCTION__);
 }
 
-// Creates a new address space for a process
+/**
+ * @brief Creates a new address space for a process
+ * 
+ * @return struct vm_address_space* Pointer to the newly allocated address space
+ * returns NULL if the allocation failed
+ */
 struct vm_address_space *vmm_new_address_space(void)
 {
     // Allocate memory for a new address space
@@ -57,7 +66,6 @@ struct vm_address_space *vmm_new_address_space(void)
     uint64_t *virt_new_pml4 = hhdm_physToVirt((void *) new_pml4);
     memset(virt_new_pml4, 0x00, PAGING_PAGE_SIZE);
 
-
     // Copy the higher half since the kernel and everything else should be always mapped into every VAS
     uint64_t *virt_kernel_pml4 = hhdm_physToVirt(kernel_vas->pml4_phys);
     for(size_t i = 256; i < 512; i++)
@@ -67,9 +75,18 @@ struct vm_address_space *vmm_new_address_space(void)
 
     return new_address_space;
 }
-
-// Our vmm allocator, this function finds an available region in the virtual address space
-// passed by argument and allocates it
+ 
+/**
+ * @brief Our vmm allocator
+ * This function finds an available region in the virtual address space
+ * passed by argument and allocates it
+ * @param space Pointer to a valid vm_address_space struct
+ * @param size The number of bytes to allocate, aligned to next page boundary
+ * @param flags Generic flags to be applied to the pages of this areas
+ * @param arg The meaning of the value depends on the type of mapping we do
+ * @return void* A pointer to the start of the virtual memory region newly allocated
+ * NULL on failure
+ */
 void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, uint64_t arg)
 {
     // Align up the size
@@ -151,6 +168,7 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
             size, 
             paging_flags, 
             false);
+
         log_log_line(LOG_DEBUG, "%s: MMIO Mapped v=0x%llx -> p=0x%llx", __FUNCTION__, candidate, phys_base);
     }
     else 
@@ -164,7 +182,14 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
     return (void *) new_area->base;
 }
 
-// Function for returning the area a virtual address belongs to
+/**
+ * @brief Function for returning the area a virtual address belongs to
+ * 
+ * @param space Pointer to a valid vm_address_space struct
+ * @param vaddr The virtual address belonging to the vm area we want
+ * @return struct vm_area* A pointer to the vm_area that contains vaddr
+ * or NULL if the area isn't allocated
+ */
 struct vm_area *vmm_get_vm_area(struct vm_address_space *space, uint64_t vaddr)
 {
     if(!space) return NULL;
@@ -184,6 +209,12 @@ struct vm_area *vmm_get_vm_area(struct vm_address_space *space, uint64_t vaddr)
     return NULL;
 }
 
+/**
+ * @brief Function for removing the page mapping of a block
+ * 
+ * @param space The address space we're interested in
+ * @param addr The base address of the virtual memory region
+ */
 void vmm_free(struct vm_address_space *space, uint64_t addr)
 {
     if(!space || !addr) return;
@@ -223,6 +254,14 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
     log_log_line(LOG_WARN, "%s: Attempted to free an invalid region: 0x%llx", __FUNCTION__, addr);
 }
 
+/**
+ * @brief This function free's everything about a VAS
+ * 1) It unmaps every area described by the vm_area list
+ * 2) It frees the vm_area structs
+ * 3) It decrements the usage of the pml4
+ * 4) It frees the addess space struct  
+ * @param space A pointer to a valid (not the kernel) address space
+ */
 void vmm_destroy_address_space(struct vm_address_space *space)
 {
     if(!space || space == kernel_vas) return;
@@ -244,7 +283,12 @@ void vmm_destroy_address_space(struct vm_address_space *space)
     kfree(space);
 }
 
-// Function to convert generic flags to x86 specific
+/**
+ * @brief Function to convert generic paging flags to x86 specific
+ * 
+ * @param genericFlags The generic flags (look into memory/vmm.h)
+ * @return uint64_t The architecture specific x86 flags (look into memory/paging.h)
+ */
 uint64_t vmm_generic_to_x86_flags(uint64_t genericFlags)
 {
     uint64_t x86_flags = 0;
@@ -259,18 +303,29 @@ uint64_t vmm_generic_to_x86_flags(uint64_t genericFlags)
     return x86_flags;
 }
 
+/**
+ * @brief Our page fault handler
+ * When interrupt 0xe (14) is fired that means there was a problem accessing
+ * a byte inside a specific page. This problem is either resolvable (because with
+ * demand paging we delay the actual physical allocation until the memory is accessed)
+ * so we simply allocate a physical page through our pmm and retry executing the instruction OR
+ * it was the process fault, accessing a page it shouldn't have. 
+ * @param context The state of the process before firing the page fault
+ */
 void vmm_page_fault_handler(struct isr_context *context)
 {
     // Cr2 is the address who caused the page fault
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2));
 
+    // What caused the fault?
     bool present = context->error_code & PAGE_FAULT_PRESENT;
     bool write = context->error_code & PAGE_FAULT_WRITE;
     bool execute = context->error_code & PAGE_FAULT_INSTRUCTION_FETCH;
     bool user = context->error_code & PAGE_FAULT_USER;
     log_log_line(LOG_DEBUG, "PF at 0x%llx (Present: %d, Write: %d, Execute: %d, User: %d)", cr2, present, write, execute, user);
 
+    // The page fault was in user space or kernel space?
     struct vm_address_space *target_vas;
     if(cr2 >= VMM_KERNEL_START)
     {
@@ -283,7 +338,7 @@ void vmm_page_fault_handler(struct isr_context *context)
 
     struct vm_area *target_area = vmm_get_vm_area(target_vas, cr2);
     
-    // No mapped memory
+    // The memory was not mapped
     if(!target_area)
     {
         log_log_line(LOG_ERROR, "SEGFAULT: Access to unmapped memory at 0x%llx (RIP: 0x%llx)", cr2, context->rip);
@@ -291,14 +346,15 @@ void vmm_page_fault_handler(struct isr_context *context)
         hcf();
     }
 
+    // If the page was present that means it's a permission violation
     if (present) {
         if (write && !(target_area->flags & VMM_FLAGS_WRITE)) {
             log_log_line(LOG_ERROR, "PROTECTION FAULT: Write to Read-Only memory at 0x%llx", cr2);
             hcf();
         }
         if (execute && !(target_area->flags & VMM_FLAGS_EXEC)) {
-             log_log_line(LOG_ERROR, "PROTECTION FAULT: Execution of NX memory at 0x%llx", cr2);
-             hcf();
+            log_log_line(LOG_ERROR, "PROTECTION FAULT: Execution of NX memory at 0x%llx", cr2);
+            hcf();
         }
         
         log_log_line(LOG_ERROR, "GENERIC PROTECTION FAULT at 0x%llx", cr2);
@@ -309,13 +365,13 @@ void vmm_page_fault_handler(struct isr_context *context)
     uint64_t phys_page = pmm_alloc(PAGING_PAGE_SIZE);
     if(!phys_page)
     {
+        // TODO: Implement swap memory mechainsm so this never happens
         log_log_line(LOG_ERROR, "%s: OOM Cannot allocate a page", __FUNCTION__);
         hcf();
     }
 
     // Zero the page, fundamental for security
     memset(hhdm_physToVirt((void *)phys_page), 0x00, PAGING_PAGE_SIZE);
-    
     
     // Map the page
     paging_map_page(hhdm_physToVirt(target_vas->pml4_phys), 
@@ -327,15 +383,28 @@ void vmm_page_fault_handler(struct isr_context *context)
     log_log_line(LOG_DEBUG, "%s: Recovered Fault at 0x%llx -> Alloc Phys 0x%llx", __FUNCTION__,cr2, phys_page);
 }
 
+/**
+ * @brief Switch the current address space
+ * 
+ * @param space A pointer to the vm_address_space we want to switch to
+ */
 void vmm_switch_address_space(struct vm_address_space *space)
 {
     if(!space) return;
 
+    // Set it as the current VAS
     current_vas = space;
 
+    // Change the CR3 register
     paging_switch_context(space->pml4_phys);
 }
 
+/**
+ * @brief Getter for the kernel virtual address space
+ * 
+ * @return struct vm_address_space* A pointer to the kernel virtual address
+ * space struct
+ */
 struct vm_address_space* vmm_get_kernel_vas()
 {
     return kernel_vas;
