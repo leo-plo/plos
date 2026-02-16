@@ -13,8 +13,9 @@
  * @name PMM page type
  * @{
  */
-#define PMM_FLAG_FREE       0
-#define PMM_FLAG_USED       1
+#define PMM_FLAG_FREE       1
+#define PMM_FLAG_USED       1 << 1
+#define PMM_FLAG_RESERVED   1 << 2
 /** @} */
 
 /**

@@ -164,7 +164,7 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
  * @note After the unmapping it decrements the number of references to the physical page
  * @note virt_addr does not have to be aligned to a page boundary
  */
-void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
+void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage, bool freePhysical)
 {
     if(!pml4_root || !virt_addr)
     {
@@ -182,7 +182,10 @@ void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
     asm volatile("invlpg (%0)" :: "r" (virt_addr) : "memory");
 
     // Decrement the number of references to the physical page
-    pmm_page_dec_ref(physAddr);    
+    if(freePhysical)
+    {
+        pmm_page_dec_ref(physAddr);
+    }       
 }
 
 /**
@@ -246,14 +249,14 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
  * @param isHugePage If true then the mapped pages are considered huge pages (2MB)
  * @note virt_addr does not have to be aligned to a page boundary
  */
-void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size, bool isHugePage)
+void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size, bool isHugePage, bool freePhysical)
 {
     uint64_t virtual;
     for(virtual = virt_addr; virtual < virt_addr + size; isHugePage ? 
         (virtual += PAGING_HUGE_PAGE_SIZE) : 
         (virtual += PAGING_PAGE_SIZE))
     {
-        paging_unmap_page(pml4_root, virtual, isHugePage);
+        paging_unmap_page(pml4_root, virtual, isHugePage, freePhysical);
     }
     log_line(LOG_DEBUG, "%s: Memory region unmapped\r\n\tvirtual range: 0x%llx - 0x%llx\r\n", 
         __FUNCTION__, virt_addr, virtual);

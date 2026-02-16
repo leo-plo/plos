@@ -6,6 +6,7 @@
 #include <memory/vmm.h>
 #include <common/logging.h>
 #include <cpu.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <libk/string.h>
@@ -241,7 +242,8 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
             paging_unmap_region(hhdm_physToVirt(space->pml4_phys), 
                 current->base, 
                 current->size,
-                false);
+                false,
+                !(current->flags & VMM_FLAGS_MMIO)); // Free the physical page only if the mapped area is not MMIO
 
             kfree(current);
             return;

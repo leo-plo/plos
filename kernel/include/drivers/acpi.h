@@ -15,7 +15,7 @@ struct RSDPDescriptorV1 {
     uint8_t Checksum;
     char OEMID[6];
     uint8_t Revision;
-    uint32_t RsdtAddress;
+    uint32_t RSDTAddress;
 } __attribute__ ((packed));
 
 /**
@@ -27,7 +27,7 @@ struct RSDPDescriptorV2 {
     uint8_t Checksum;
     char OEMID[6];
     uint8_t Revision;
-    uint32_t RsdtAddress;
+    uint32_t RSDTAddress;
 
     // Valid fields only if Revision == 2
     uint32_t Length;
@@ -58,9 +58,7 @@ struct XSDT {
     uint64_t sdtAddresses[];
 } __attribute__((packed));
 
-bool acpi_set_correct_RSDT();
-bool acpi_isXSDT(void);
-void *acpi_get_current_RSDT(void);
+void acpi_init(void);
 void *acpi_find_table(const char *signature);
 
 #endif // ACPI_H

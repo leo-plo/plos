@@ -1,3 +1,5 @@
+#include <common/logging.h>
+#include <cpu.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,9 +10,10 @@
 extern struct limine_rsdp_request rsdp_request;
 
 static bool useXSDT = false;
-static void* currentRSDT = NULL;
+static struct RSDT *rsdt = NULL;
+static struct XSDT *xsdt = NULL;
 
-static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
+static bool validate_checksum(uint8_t *byte_array, size_t size) {
     uint32_t sum = 0;
     for(size_t i = 0; i < size; i++) {
         sum += byte_array[i];
@@ -18,56 +21,76 @@ static bool checksum_RSDP(uint8_t *byte_array, size_t size) {
     return (sum & 0xFF) == 0;
 }
 
-// Returns true if the rdsp is initialized correctly
-bool acpi_set_correct_RSDT()
+/**
+ * @brief Initialize the ACPI
+ * Verifys the tables and checksums
+ * @note sets useXSDT and rsdt/xsdt global variables
+ */
+void acpi_init()
 {
     struct RSDPDescriptorV2 *rsdp = rsdp_request.response->address;
-    if(!rsdp)
-    {
-        return false;
-    }
 
     // Verify the signature
     if(strncmp(rsdp->Signature, RSDP_SIGNATURE, 8) != 0)
     {
-        return false;
+        log_line(LOG_ERROR, "%s: The RSDP signature is invalid", __FUNCTION__);
+        hcf();
     }
 
-    useXSDT = rsdp->Revision == 2;
-    currentRSDT = hhdm_physToVirt(useXSDT ? (void *)rsdp->XSDTAddress : 
-                    (void *)(uint64_t)rsdp->RsdtAddress);
+    // Validate the v1 checksum
+    if(!validate_checksum((uint8_t *) rsdp, sizeof(struct RSDPDescriptorV1)))
+    {
+        log_line(LOG_ERROR, "%s: The RSDPV1 checksum is invalid", __FUNCTION__);
+        hcf();
+    }
 
-    return checksum_RSDP((uint8_t *)rsdp, useXSDT ? sizeof(struct RSDPDescriptorV2) :
-                    sizeof(struct RSDPDescriptorV1));
+    // Check if we can use XSDT
+    if(rsdp->Revision >= 2 && rsdp->XSDTAddress != 0)
+    {
+        // Validate the v2 checksum
+        if(!validate_checksum((uint8_t *) rsdp, sizeof(struct RSDPDescriptorV2)))
+        {
+            log_line(LOG_ERROR, "%s: The RSDPV2 checksum is invalid", __FUNCTION__);
+            hcf();
+        }
+
+        useXSDT = true;
+        xsdt = hhdm_physToVirt((void *) rsdp->XSDTAddress);
+        log_line(LOG_SUCCESS, "%s: xsdt pointer obtained", __FUNCTION__);
+    }
+    else 
+    {
+        useXSDT = false;
+        rsdt = hhdm_physToVirt((void *)(uint64_t)rsdp->RSDTAddress);
+        log_line(LOG_SUCCESS, "%s: rsdt pointer obtained", __FUNCTION__);
+        
+    }
 }
 
-// Returns true if the RSDP revision is 2
-bool acpi_isXSDT(void)
-{
-    return useXSDT;
-}
-
-// Returns the local table
-void *acpi_get_current_RSDT(void)
-{
-    return currentRSDT; 
-}
-
-// Find a specific sdt table (es. "MADT")
+/**
+ * @brief Find a specific sdt table (es. "MADT")
+ * 
+ * @param signature The 4 bytes signature of the table we want to search for 
+ * @return void* A pointer to the table header if found, NULL otherwise
+ */
 void *acpi_find_table(const char *signature)
 {
-    struct RSDT *rsdt = currentRSDT;
-    struct XSDT *xsdt = currentRSDT;
+    if(!rsdt || !xsdt) return NULL;
 
-    size_t numEntries = useXSDT ? (xsdt->sdtHeader.Length - sizeof(xsdt->sdtHeader)) / sizeof(xsdt->sdtAddresses[0])
-                            : (rsdt->sdtHeader.Length - sizeof(rsdt->sdtHeader)) / sizeof(rsdt->sdtAddresses[0]);
-    
+    // Calculate the number of entries
+    size_t numEntries;
+    if(useXSDT)
+        numEntries = (xsdt->sdtHeader.Length - sizeof(struct ACPISDTHeader)) / 8;
+    else 
+        numEntries = (rsdt->sdtHeader.Length - sizeof(struct ACPISDTHeader)) / 4;
+
+    // Iterate all the tables
     for(size_t i = 0; i < numEntries; i++)
     {
         uint64_t physAddr = (useXSDT ? xsdt->sdtAddresses[i] : (uint64_t)rsdt->sdtAddresses[i]);
-        
         struct ACPISDTHeader *currentTable = hhdm_physToVirt((void *)physAddr);
 
+        // Check for signature match
         if(strncmp(currentTable->Signature, signature, 4) == 0)
         {
             return (void *)currentTable;

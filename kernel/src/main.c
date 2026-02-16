@@ -1,4 +1,5 @@
 #include <drivers/console.h>
+#include <drivers/lapic.h>
 #include <flanterm.h>
 #include <memory/kheap.h>
 #include <memory/paging.h>
@@ -22,23 +23,29 @@ void kmain(void) {
 
     limine_verify_requests();
     
+    // Global descriptor table
     gdt_init();
+    // Interrupt descriptor table
     idt_init();
 
+    // Physical memory manager initialization
     pmm_printUsableRegions();
     pmm_init();
     pmm_dump_state();
-    paging_init();
-    kheap_init();
-    vmm_init();
 
+    // Paging setup
+    paging_init();
+
+    // Kernel heap initialization
+    kheap_init();
+
+    // Virtual memory manager setup
+    vmm_init();
+    
     console_init();
 
-    if(!acpi_set_correct_RSDT())
-    {
-        log_line(LOG_ERROR, "Error, cannot initialize RSDT");
-        hcf();
-    }
+    acpi_init();
+    lapic_initialize();
 
     // We're done, just hang...
     hcf();

@@ -41,7 +41,7 @@ static inline uint64_t page_to_phys(struct pmm_page *page) { return page_to_pfn(
 
 static inline struct pmm_page *phys_to_page(uint64_t phys) { return pfn_to_page(phys/PMM_PAGE_SIZE); }
 
-static inline bool is_page_free(struct pmm_page *page) { return !(page->flags & PMM_FLAG_USED); }
+static inline bool is_page_free(struct pmm_page *page) { return (page->flags & PMM_FLAG_FREE) != 0; }
 
 /*************************************************************************/
 
@@ -297,7 +297,7 @@ void pmm_init()
     used_pages = totalPages;
     for(uint64_t i = 0; i < totalPages; i++)
     {
-        buddy_memmap[i].flags |= PMM_FLAG_USED;
+        buddy_memmap[i].flags |= PMM_FLAG_RESERVED;
         buddy_memmap[i].ref_count = 1;
     }
 
