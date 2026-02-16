@@ -24,7 +24,7 @@ void vmm_init(void)
     kernel_vas = kmalloc(sizeof(struct vm_address_space));
     if(!kernel_vas)
     {
-        log_log_line(LOG_ERROR, "%s: Cannot allocate space for kernel_vas", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: Cannot allocate space for kernel_vas", __FUNCTION__);
         hcf();
     }
 
@@ -35,7 +35,7 @@ void vmm_init(void)
     // Set the current vas as the kernel
     current_vas = kernel_vas;
 
-    log_log_line(LOG_SUCCESS, "%s: Virtual memory manager initialized", __FUNCTION__);
+    log_line(LOG_SUCCESS, "%s: Virtual memory manager initialized", __FUNCTION__);
 }
 
 /**
@@ -169,14 +169,14 @@ void *vmm_alloc(struct vm_address_space *space, uint64_t size, uint64_t flags, u
             paging_flags, 
             false);
 
-        log_log_line(LOG_DEBUG, "%s: MMIO Mapped v=0x%llx -> p=0x%llx", __FUNCTION__, candidate, phys_base);
+        log_line(LOG_DEBUG, "%s: MMIO Mapped v=0x%llx -> p=0x%llx", __FUNCTION__, candidate, phys_base);
     }
     else 
     {
         // Demanding paging
         // We do nothing, the page fault handler will load the page
         // as soon as the prcess accesses those addresses
-        log_log_line(LOG_DEBUG, "VMM: Lazy Allocation at v=0x%llx (Phys: None yet)", candidate);
+        log_line(LOG_DEBUG, "VMM: Lazy Allocation at v=0x%llx (Phys: None yet)", candidate);
     }
 
     return (void *) new_area->base;
@@ -251,7 +251,7 @@ void vmm_free(struct vm_address_space *space, uint64_t addr)
         current = current->next;
     }
 
-    log_log_line(LOG_WARN, "%s: Attempted to free an invalid region: 0x%llx", __FUNCTION__, addr);
+    log_line(LOG_WARN, "%s: Attempted to free an invalid region: 0x%llx", __FUNCTION__, addr);
 }
 
 /**
@@ -295,6 +295,8 @@ uint64_t vmm_generic_to_x86_flags(uint64_t genericFlags)
     if(genericFlags & VMM_FLAGS_READ) x86_flags |= 0;
     if(genericFlags & VMM_FLAGS_WRITE) x86_flags |= PTE_FLAG_RW;
     if(!(genericFlags & VMM_FLAGS_EXEC)) x86_flags |= PTE_FLAG_NO_EXEC;
+    if(genericFlags & VMM_FLAGS_WC) x86_flags |= PTE_CACHE_WC;
+    if(genericFlags & VMM_FLAGS_UC) x86_flags |= PTE_CACHE_UC;
     if(genericFlags & VMM_FLAGS_USER) 
         x86_flags |= PTE_FLAG_US;
     else
@@ -323,7 +325,7 @@ void vmm_page_fault_handler(struct isr_context *context)
     bool write = context->error_code & PAGE_FAULT_WRITE;
     bool execute = context->error_code & PAGE_FAULT_INSTRUCTION_FETCH;
     bool user = context->error_code & PAGE_FAULT_USER;
-    log_log_line(LOG_DEBUG, "PF at 0x%llx (Present: %d, Write: %d, Execute: %d, User: %d)", cr2, present, write, execute, user);
+    log_line(LOG_DEBUG, "PF at 0x%llx (Present: %d, Write: %d, Execute: %d, User: %d)", cr2, present, write, execute, user);
 
     // The page fault was in user space or kernel space?
     struct vm_address_space *target_vas;
@@ -341,7 +343,7 @@ void vmm_page_fault_handler(struct isr_context *context)
     // The memory was not mapped
     if(!target_area)
     {
-        log_log_line(LOG_ERROR, "SEGFAULT: Access to unmapped memory at 0x%llx (RIP: 0x%llx)", cr2, context->rip);
+        log_line(LOG_ERROR, "SEGFAULT: Access to unmapped memory at 0x%llx (RIP: 0x%llx)", cr2, context->rip);
         // TODO: kill the offending process
         hcf();
     }
@@ -349,15 +351,15 @@ void vmm_page_fault_handler(struct isr_context *context)
     // If the page was present that means it's a permission violation
     if (present) {
         if (write && !(target_area->flags & VMM_FLAGS_WRITE)) {
-            log_log_line(LOG_ERROR, "PROTECTION FAULT: Write to Read-Only memory at 0x%llx", cr2);
+            log_line(LOG_ERROR, "PROTECTION FAULT: Write to Read-Only memory at 0x%llx", cr2);
             hcf();
         }
         if (execute && !(target_area->flags & VMM_FLAGS_EXEC)) {
-            log_log_line(LOG_ERROR, "PROTECTION FAULT: Execution of NX memory at 0x%llx", cr2);
+            log_line(LOG_ERROR, "PROTECTION FAULT: Execution of NX memory at 0x%llx", cr2);
             hcf();
         }
         
-        log_log_line(LOG_ERROR, "GENERIC PROTECTION FAULT at 0x%llx", cr2);
+        log_line(LOG_ERROR, "GENERIC PROTECTION FAULT at 0x%llx", cr2);
         hcf();
     }
 
@@ -366,7 +368,7 @@ void vmm_page_fault_handler(struct isr_context *context)
     if(!phys_page)
     {
         // TODO: Implement swap memory mechainsm so this never happens
-        log_log_line(LOG_ERROR, "%s: OOM Cannot allocate a page", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: OOM Cannot allocate a page", __FUNCTION__);
         hcf();
     }
 
@@ -380,7 +382,7 @@ void vmm_page_fault_handler(struct isr_context *context)
         vmm_generic_to_x86_flags(target_area->flags),
         false);
     
-    log_log_line(LOG_DEBUG, "%s: Recovered Fault at 0x%llx -> Alloc Phys 0x%llx", __FUNCTION__,cr2, phys_page);
+    log_line(LOG_DEBUG, "%s: Recovered Fault at 0x%llx -> Alloc Phys 0x%llx", __FUNCTION__,cr2, phys_page);
 }
 
 /**

@@ -1,42 +1,62 @@
 #include <common/logging.h>
+#include <drivers/serial.h>
+#include <drivers/console.h>
 #include <stdarg.h>
 #include <libk/stdio.h>
+#include <libk/string.h>
+#include <stdbool.h>
+#include <stddef.h>
 
-char *logStrings[] = {
-    "DEBUG",
+char log_buffer[LOG_BUFFER_DIM];
+
+char *log_labels[] = {
+    "DBG",
+    "OK" ,
     "WARN",
-    "ERROR",
-    "SUCCESS"      
+    "ERR",
 };
 
-static enum logOutput outputType;
+char *log_colors[] = {
+    "\033[0m", // DEBUG
+    "\033[32m", // OK
+    "\033[33m", // WARN
+    "\033[31m"  // ERROR
+};
 
-void log_init(enum logOutput out)
+void log_line(enum logType logLevel, char *fmt, ...)
 {
-    if(out == LOG_SERIAL)
-    {
-        printf("\n");
-    }
-    outputType = out;
-}
+    bool send_to_console = (logLevel != LOG_DEBUG);
+    char *ptr = log_buffer;
 
-void log_log_line(enum logType logLevel, char *fmt, ...)
-{
+    ptr[0] = '[';
+    ptr++;
+
+    strcpy(ptr, log_colors[logLevel]);
+    ptr += strlen(log_colors[logLevel]);
+    
+    strcpy(ptr, log_labels[logLevel]);
+    ptr += strlen(log_labels[logLevel]);
+
+    strcpy(ptr, "\033[0m");
+    ptr += 4;
+
+    strcpy(ptr, "]\t");
+    ptr += 2;
+
     va_list args;
     va_start(args, fmt);
-
-    switch(outputType)
-    {
-        case LOG_SERIAL:
-            printf("[%s] ", logStrings[logLevel]);
-            vprintf(fmt, args);
-            printf("\n");
-        break;
-        
-        // TODO: Implement a framebuffer "text mode"
-        case LOG_FRAMEBUFFER:
-        break;
-    }
-
+    
+    size_t remaining = sizeof(log_buffer) - (ptr - log_buffer) - 2; // -2 for newline and NULL
+    int written = vsnprintf(ptr, remaining, fmt, args);
+    ptr += written;
     va_end(args);
+
+    *ptr++ = '\n';
+    *ptr = '\0';
+
+    serial_write_str(log_buffer, ptr - log_buffer);
+
+    if (send_to_console) {
+        console_write_str(log_buffer, ptr - log_buffer);
+    }
 }

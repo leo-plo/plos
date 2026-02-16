@@ -1,10 +1,8 @@
-#include "flanterm_backends/fb.h"
+#include <drivers/console.h>
 #include <flanterm.h>
 #include <memory/kheap.h>
 #include <memory/paging.h>
 #include <memory/vmm.h>
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
 #include <limine.h>
 #include <cpu.h>
@@ -18,14 +16,10 @@
 #include <limine_requests.h>
 #include <memory/hhdm.h>
 
-extern struct limine_framebuffer_request framebuffer_request;
-
 // This is our kernel's entry point.
 void kmain(void) {
 
     limine_verify_requests();
-
-    log_init(LOG_SERIAL);
     
     gdt_init();
     idt_init();
@@ -37,12 +31,13 @@ void kmain(void) {
     kheap_init();
     vmm_init();
 
+    console_init();
+
     if(!acpi_set_correct_RSDT())
     {
-        log_log_line(LOG_ERROR, "Error, cannot initialize RSDT");
+        log_line(LOG_ERROR, "Error, cannot initialize RSDT");
         hcf();
     }
-
 
     // We're done, just hang...
     hcf();

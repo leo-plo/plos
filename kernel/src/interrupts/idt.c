@@ -51,5 +51,5 @@ void idt_init(void)
     
     // Finally load the new idt
     idt_load(&idtr);
-    log_log_line(LOG_SUCCESS, "%s: IDT initialized", __FUNCTION__);
+    log_line(LOG_SUCCESS, "%s: IDT initialized", __FUNCTION__);
 }

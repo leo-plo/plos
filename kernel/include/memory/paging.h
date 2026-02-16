@@ -24,6 +24,10 @@
 #define PTE_FLAG_US         (1ull << 2)
 #define PTE_FLAG_RW         (1ull << 1)
 #define PTE_FLAG_PRESENT    (1ull << 0)
+#define PTE_CACHE_WC        PTE_FLAG_PWT
+#define PTE_CACHE_UC        PTE_FLAG_PCD
+#define PTE_CACHE_WB        0
+/** @} */
 
 /**
  * @name Page fault error code flags
@@ -52,6 +56,19 @@
 /** @} */
 
 #define PAGING_PTE_ADDR_MASK 0x000FFFFFFFFFF000 ///< The physical address mask to use on a page table entry
+
+#define MSR_IA32_PAT 0x277 ///< The msr for managing the PAT
+
+/**
+ * @name Type of caches for pages
+ * @{
+ */
+#define PAT_TYPE_UC  0x00 ///< Uncacheable
+#define PAT_TYPE_WC  0x01 ///< Write-Combining
+#define PAT_TYPE_WT  0x04 ///< Write-Through
+#define PAT_TYPE_WB  0x06 ///< Write-Back
+#define PAT_TYPE_UCM 0x07 ///< Uncacheable Minus
+/** @} */
 
 void paging_init(void);
 void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr, uint64_t flags, bool isHugePage);

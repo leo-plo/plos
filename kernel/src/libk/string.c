@@ -127,3 +127,8 @@ int strncmp(const char *s1, const char *s2, register size_t n)
     }
     return 0;
 }
+
+char *strcpy (char *dest, const char *src)
+{
+  return memcpy (dest, src, strlen (src) + 1);
+}

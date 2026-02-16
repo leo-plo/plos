@@ -1,8 +1,9 @@
 #include <drivers/portsIO.h>
+#include <stddef.h>
 
 #define PORT 0x3f8          // COM1
 
-int init_serial(void) 
+int serial_init(void) 
 {
     outb(PORT + 1, 0x00);    // Disable all interrupts
     outb(PORT + 3, 0x80);    // Enable DLAB (set baud rate divisor)
@@ -30,7 +31,7 @@ int serial_received()
     return inb(PORT + 5) & 1;
 }
  
-char read_serial() 
+char serial_read() 
 {
     while (serial_received() == 0);
 
@@ -42,8 +43,14 @@ int is_transmit_empty()
     return inb(PORT + 5) & 0x20;
 }
  
-void write_serial(char a) {
+void serial_write(char a) {
     while (is_transmit_empty() == 0);
 
     outb(PORT,a);
+}
+
+void serial_write_str(const char* str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        serial_write(str[i]);
+    }
 }

@@ -28,6 +28,8 @@
 #define VMM_FLAGS_USER      (1ull << 3)     ///< User accessible page
 #define VMM_FLAGS_ANON      (1ull << 4)     ///< Anonymous page
 #define VMM_FLAGS_MMIO      (1ull << 5)     ///< Memory mapped I/O in this page
+#define VMM_FLAGS_WC        (1ull << 6)     ///< For write combine cache (useful for framebuffers)
+#define VMM_FLAGS_UC        (1ull << 7)     ///< For uncacheable pages (eg. MMIO)
 /** @} */
 
 /**

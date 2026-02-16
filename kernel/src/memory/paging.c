@@ -136,7 +136,7 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
     // The root MUST point to a valid address and we won't map to page zero
     if(!pml4_root || !virt_addr)
     {
-        log_log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
         hcf();
     }
 
@@ -144,7 +144,7 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
     uint64_t *pte = vmm_get_pte(pml4_root, virt_addr, true, isHugePage);
     if(!pte)
     {
-        log_log_line(LOG_ERROR, "%s: Cannot map new page %llx: OOP", __FUNCTION__, virt_addr);
+        log_line(LOG_ERROR, "%s: Cannot map new page %llx: OOP", __FUNCTION__, virt_addr);
         hcf();
     }
 
@@ -168,7 +168,7 @@ void paging_unmap_page(uint64_t *pml4_root, uint64_t virt_addr, bool isHugePage)
 {
     if(!pml4_root || !virt_addr)
     {
-        log_log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
         hcf();
     }
 
@@ -199,7 +199,7 @@ void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t 
 {
     if(!pml4_root || !virt_addr)
     {
-        log_log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: Error address invalid", __FUNCTION__);
         hcf();
     }
 
@@ -233,7 +233,7 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
     {
         paging_map_page(pml4_root, virtual, physical, flags, isHugePage);
     }
-    log_log_line(LOG_DEBUG, "%s: Memory region mapped\n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: virtual range: 0x%llx - 0x%llx", 
+    log_line(LOG_DEBUG, "%s: Memory region mapped\n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: 0x%llx - 0x%llx", 
         __FUNCTION__, virt_addr, virtual, phys_addr, physical);
 }
 
@@ -255,7 +255,7 @@ void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size,
     {
         paging_unmap_page(pml4_root, virtual, isHugePage);
     }
-    log_log_line(LOG_DEBUG, "%s: Memory region unmapped\n\tvirtual range: 0x%llx - 0x%llx\n", 
+    log_line(LOG_DEBUG, "%s: Memory region unmapped\n\tvirtual range: 0x%llx - 0x%llx\n", 
         __FUNCTION__, virt_addr, virtual);
 }
 
@@ -270,16 +270,29 @@ void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size,
  */
 void paging_init(void)
 {
+    // Write to the MSRs responsible for PAT
+    uint64_t pat_val = 0;
+    pat_val |= (uint64_t)PAT_TYPE_WB  << 0;  // PA0
+    pat_val |= (uint64_t)PAT_TYPE_WC  << 8;  // PA1
+    pat_val |= (uint64_t)PAT_TYPE_UC  << 16; // PA2
+    pat_val |= (uint64_t)PAT_TYPE_UC  << 24; // PA3
+    pat_val |= (uint64_t)PAT_TYPE_WB  << 32; // PA4
+    pat_val |= (uint64_t)PAT_TYPE_WC  << 40; // PA5
+    pat_val |= (uint64_t)PAT_TYPE_UC  << 48; // PA6
+    pat_val |= (uint64_t)PAT_TYPE_UC  << 56; // PA7
+
+    cpu_wrmsr(MSR_IA32_PAT, pat_val);
+
     // Allocate the kernel pml4
     kernel_pml4_phys = (uint64_t *) pmm_alloc(PAGING_PAGE_SIZE);
     if(!kernel_pml4_phys)
     {
-        log_log_line(LOG_ERROR, "%s: Cannot allocate the kernel PML4", __FUNCTION__);
+        log_line(LOG_ERROR, "%s: Cannot allocate the kernel PML4", __FUNCTION__);
         hcf();
     }
     memset(hhdm_physToVirt((void *)kernel_pml4_phys), 0x00, PAGING_PAGE_SIZE);
     
-    log_log_line(LOG_DEBUG, "%s: Created the kernel_pml4_phys and zeroed it; physical address: 0x%llx", __FUNCTION__, kernel_pml4_phys);
+    log_line(LOG_DEBUG, "%s: Created the kernel_pml4_phys and zeroed it; physical address: 0x%llx", __FUNCTION__, kernel_pml4_phys);
 
     
     // ************ Kernel mapping ****************
@@ -338,11 +351,12 @@ void paging_init(void)
     {
         cr4 |= CR4_PGE_BIT;
         write_cr4(cr4);
-        log_log_line(LOG_DEBUG, "%s: CR4 Global Pages (PGE) Enabled", __FUNCTION__);
+        log_line(LOG_DEBUG, "%s: CR4 Global Pages (PGE) Enabled", __FUNCTION__);
     }
 
+
     paging_switch_context(kernel_pml4_phys);
-    log_log_line(LOG_SUCCESS, "%s: Switched to kernel pml4.", __FUNCTION__);
+    log_line(LOG_SUCCESS, "%s: Switched to kernel pml4.", __FUNCTION__);
 }
 
 /**

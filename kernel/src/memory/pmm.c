@@ -55,7 +55,7 @@ void pmm_free_pages(uint64_t phys, uint32_t order)
 {
     if(phys % PMM_PAGE_SIZE)
     {
-        log_log_line(LOG_WARN, "%s: Warning freeing unaligned address %llx", __FUNCTION__, phys);
+        log_line(LOG_WARN, "%s: Warning freeing unaligned address %llx", __FUNCTION__, phys);
         return;
     }
 
@@ -256,7 +256,7 @@ void pmm_init()
     // Calculate the size needed to host our structs
     buddy_memmap_size = totalPages * sizeof(struct pmm_page);
 
-    log_log_line(LOG_DEBUG, "%s: highest addr: 0x%llx; Total pages: 0x%llu; buddy_memmap_size: 0x%llx bytes", __FUNCTION__,highestAddr, totalPages, buddy_memmap_size);
+    log_line(LOG_DEBUG, "%s: highest addr: 0x%llx; Total pages: 0x%llu; buddy_memmap_size: 0x%llx bytes", __FUNCTION__,highestAddr, totalPages, buddy_memmap_size);
 
     // Find the first usable region to store our memmap
     for(size_t i = 0; i < memmap->entry_count; i++)
@@ -280,7 +280,7 @@ void pmm_init()
     // If no region is found we abort
     if(!buddy_memmap)
     {
-        log_log_line(LOG_ERROR, "%s, Not enough memory for buddy allocator structures", __FUNCTION__);
+        log_line(LOG_ERROR, "%s, Not enough memory for buddy allocator structures", __FUNCTION__);
         hcf();
     }
 
@@ -351,7 +351,7 @@ void pmm_init()
         }
     }
 
-    log_log_line(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
+    log_line(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
 }
 
 /**
@@ -393,7 +393,7 @@ void pmm_page_dec_ref(uint64_t phys)
  */
 void pmm_dump_state(void)
 {
-    log_log_line(LOG_DEBUG, "--- BUDDY ALLOCATOR STATE ---");
+    log_line(LOG_DEBUG, "--- BUDDY ALLOCATOR STATE ---");
 
     for (int i = 0; i < PMM_MAX_ORDER; i++)
     {
@@ -401,16 +401,16 @@ void pmm_dump_state(void)
         {
             uint64_t block_size = (1ULL << i) * PMM_PAGE_SIZE;
             
-            log_log_line(LOG_DEBUG, "Order %d (%llu KB): %llu blocks free", i, block_size / 1024, free_areas[i].nr_free);
+            log_line(LOG_DEBUG, "Order %d (%llu KB): %llu blocks free", i, block_size / 1024, free_areas[i].nr_free);
             
         }
     }
 
-    log_log_line(LOG_DEBUG, "-----------------------------");
-    log_log_line(LOG_DEBUG, "Total Memory: %llu MB", (totalPages * PMM_PAGE_SIZE) / 1024 / 1024);
-    log_log_line(LOG_DEBUG, "Used Memory:  %llu MB", (used_pages * PMM_PAGE_SIZE) / 1024 / 1024);
-    log_log_line(LOG_DEBUG, "Free Memory:  %llu MB", ((totalPages - used_pages) * PMM_PAGE_SIZE) / 1024 / 1024);
-    log_log_line(LOG_DEBUG, "-----------------------------");
+    log_line(LOG_DEBUG, "-----------------------------");
+    log_line(LOG_DEBUG, "Total Memory: %llu MB", (totalPages * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_line(LOG_DEBUG, "Used Memory:  %llu MB", (used_pages * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_line(LOG_DEBUG, "Free Memory:  %llu MB", ((totalPages - used_pages) * PMM_PAGE_SIZE) / 1024 / 1024);
+    log_line(LOG_DEBUG, "-----------------------------");
 }
 
 /**
@@ -421,13 +421,13 @@ void pmm_printUsableRegions()
 {
     struct limine_memmap_response *memmap = memmap_request.response;
 
-    log_log_line(LOG_DEBUG, "%s: Printing system memory map: ", __FUNCTION__);
+    log_line(LOG_DEBUG, "%s: Printing system memory map: ", __FUNCTION__);
     for(size_t i = 0; i < memmap->entry_count; i++)
     {
         struct limine_memmap_entry *entry = memmap->entries[i];
         if(entry->type == LIMINE_MEMMAP_USABLE)
         {
-            log_log_line(LOG_DEBUG, "%d) Usable region; Phys range: 0x%llx - 0x%llx; Length: %llu bytes", i+1, entry->base, entry->base + entry->length, entry->length);
+            log_line(LOG_DEBUG, "%d) Usable region; Phys range: 0x%llx - 0x%llx; Length: %llu bytes", i+1, entry->base, entry->base + entry->length, entry->length);
         }
     }
 }

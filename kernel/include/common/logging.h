@@ -6,21 +6,13 @@
  */
 enum logType {
     LOG_DEBUG,
+    LOG_SUCCESS,
     LOG_WARN,
     LOG_ERROR,
-    LOG_SUCCESS
 };
 
-/**
- * @brief The type of the output log
- */
-enum logOutput {
-    LOG_SERIAL, ///< Log onto a file that qemu redirects output to
-    LOG_FRAMEBUFFER, ///< Onto the screen usign the framebuffer
-    LOG_BOTH ///< Use both
-};
+#define LOG_BUFFER_DIM 1024
 
-void log_init(enum logOutput out);
-void log_log_line(enum logType logLevel, char *fmt, ...);
+void log_line(enum logType logLevel, char *fmt, ...);
 
 #endif // LOGGING_H

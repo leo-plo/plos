@@ -36,7 +36,7 @@ void kheap_init(void)
     // We map the initial memory region of the heap
     kheap_extend(KHEAP_STARTING_SIZE);
 
-    log_log_line(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
+    log_line(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
 }
 
 /**
@@ -101,7 +101,7 @@ bool kheap_extend(size_t size)
 
     kheap_end += numPages * PAGING_PAGE_SIZE;
 
-    log_log_line(LOG_DEBUG, "%s: The heap has been expanded by %llu bytes; new kheap_end = %llx",__FUNCTION__, numPages * PAGING_PAGE_SIZE, kheap_end);
+    log_line(LOG_DEBUG, "%s: The heap has been expanded by %llu bytes; new kheap_end = %llx",__FUNCTION__, numPages * PAGING_PAGE_SIZE, kheap_end);
     return true;
 }
 
@@ -169,11 +169,11 @@ void* kmalloc(size_t size)
  */
 void kheap_print_nodes()
 {
-    log_log_line(LOG_DEBUG, "%s: Kernel heap current nodes:", __FUNCTION__);
+    log_line(LOG_DEBUG, "%s: Kernel heap current nodes:", __FUNCTION__);
     struct kheap_node *current = kheap_head;
     while(current)
     {
-        log_log_line(LOG_DEBUG, "Region: 0x%llx - 0x%llx; isFree: %s; size: %lld bytes", 
+        log_line(LOG_DEBUG, "Region: 0x%llx - 0x%llx; isFree: %s; size: %lld bytes", 
             (uint64_t)current + sizeof(struct kheap_node), 
             (uint64_t)current + sizeof(struct kheap_node) + current->size,
             current->isFree ? "true" : "false", 
@@ -223,7 +223,7 @@ void kfree(void *ptr)
     // Check for double free
     if(node_to_free->isFree)
     {
-        log_log_line(LOG_WARN, "%s: Kernel heap double free detected; virtual addr: 0x%llx", __FUNCTION__, ptr);
+        log_line(LOG_WARN, "%s: Kernel heap double free detected; virtual addr: 0x%llx", __FUNCTION__, ptr);
         return;
     }
 
