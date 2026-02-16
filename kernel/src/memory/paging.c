@@ -233,7 +233,7 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
     {
         paging_map_page(pml4_root, virtual, physical, flags, isHugePage);
     }
-    log_line(LOG_DEBUG, "%s: Memory region mapped\n\tvirtual range: 0x%llx - 0x%llx\n\tphysical range: 0x%llx - 0x%llx", 
+    log_line(LOG_DEBUG, "%s: Memory region mapped\r\n\tvirtual range: 0x%llx - 0x%llx\r\n\tphysical range: 0x%llx - 0x%llx", 
         __FUNCTION__, virt_addr, virtual, phys_addr, physical);
 }
 
@@ -255,7 +255,7 @@ void paging_unmap_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t size,
     {
         paging_unmap_page(pml4_root, virtual, isHugePage);
     }
-    log_line(LOG_DEBUG, "%s: Memory region unmapped\n\tvirtual range: 0x%llx - 0x%llx\n", 
+    log_line(LOG_DEBUG, "%s: Memory region unmapped\r\n\tvirtual range: 0x%llx - 0x%llx\r\n", 
         __FUNCTION__, virt_addr, virtual);
 }
 

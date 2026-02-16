@@ -351,7 +351,7 @@ void pmm_init()
         }
     }
 
-    log_line(LOG_SUCCESS, "%s: PMM initialized:\n\tBuddy allocator structures size %lu bytes\n\tBuddy allocator start virt addr 0x%lx\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
+    log_line(LOG_SUCCESS, "%s: PMM initialized:\r\n\tBuddy allocator structures size %lu bytes\r\n\tBuddy allocator start virt addr 0x%lx\r\n\tManaging %llu pages", __FUNCTION__, buddy_memmap_size, buddy_memmap, totalPages);
 }
 
 /**

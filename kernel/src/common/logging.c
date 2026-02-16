@@ -51,6 +51,7 @@ void log_line(enum logType logLevel, char *fmt, ...)
     ptr += written;
     va_end(args);
 
+    *ptr++ = '\r';
     *ptr++ = '\n';
     *ptr = '\0';
 

@@ -36,7 +36,7 @@ void kheap_init(void)
     // We map the initial memory region of the heap
     kheap_extend(KHEAP_STARTING_SIZE);
 
-    log_line(LOG_SUCCESS, "%s: Kernel heap initialized\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
+    log_line(LOG_SUCCESS, "%s: Kernel heap initialized\r\n\tVirtual range: 0x%llx - 0x%llx", __FUNCTION__, kheap_start, kheap_end);
 }
 
 /**

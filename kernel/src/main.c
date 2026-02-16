@@ -15,6 +15,7 @@
 #include <common/logging.h>
 #include <limine_requests.h>
 #include <memory/hhdm.h>
+#include <libk/stdio.h>
 
 // This is our kernel's entry point.
 void kmain(void) {
