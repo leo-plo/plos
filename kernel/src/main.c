@@ -1,3 +1,4 @@
+#include <devices/timer.h>
 #include <drivers/console.h>
 #include <drivers/lapic.h>
 #include <flanterm.h>
@@ -46,6 +47,10 @@ void kmain(void) {
 
     acpi_init();
     lapic_initialize();
+
+    timer_init();
+
+    asm volatile ("sti");
 
     // We're done, just hang...
     hcf();

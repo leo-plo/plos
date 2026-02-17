@@ -1,4 +1,5 @@
 #include <common/logging.h>
+#include <devices/timer.h>
 #include <drivers/lapic.h>
 #include <memory/vmm.h>
 #include <interrupts/isr.h>
@@ -17,6 +18,8 @@ void interrupt_handler(struct isr_context *context)
         case 14: // Page fault
             vmm_page_fault_handler(context);
             break;
+        case 32:
+            timer_handler();
         case 0xFF: // Spurious interrupt
             lapic_spurious_isr();
             break;
