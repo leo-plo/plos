@@ -11,13 +11,13 @@ override IMAGE_NAME := plos-$(ARCH)
 
 # Toolchain for building the 'limine' executable for the host.
 HOST_CC := cc
-HOST_CFLAGS := -g -O2
+HOST_CFLAGS := -ggdb -O2
 HOST_CPPFLAGS :=
 HOST_LDFLAGS :=
 HOST_LIBS :=
 
 .PHONY: all
-all: $(IMAGE_NAME).iso
+all: $(IMAGE_NAME).iso docs
 
 .PHONY: run
 run: run-$(ARCH)

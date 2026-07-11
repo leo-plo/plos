@@ -47,7 +47,7 @@ clone_repo_commit \
     42e836e30242c2c14f889fd76c6f9a57b0c18ec2
 
 clone_repo_commit \
-    https://codeberg.org/Mintsuki/Flanterm.git \
+    https://github.com/Mintsuki/Flanterm.git \
     flanterm \
     
 
