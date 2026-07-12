@@ -7,8 +7,9 @@
 
 #define PMM_PAGE_SIZE 4096 //< The initial size of each page
 
-#define PMM_MAX_ORDER       11 // Maximum buddy size 2^22 = 4MB
+#define PMM_MAX_ORDER 11 //< Maximum buddy size 2^22 = 4MB
 
+// TODO: Use an enum
 /**
  * @name PMM page type
  * @{

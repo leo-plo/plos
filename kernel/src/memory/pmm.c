@@ -276,7 +276,7 @@ void pmm_init()
     // Calculate the size needed to host our structs
     buddy_memmap_size = totalPages * sizeof(struct pmm_page);
 
-    log_line(LOG_DEBUG, "%s: highest addr: 0x%llx; Total pages: 0x%llu; buddy_memmap_size: 0x%llx bytes", __FUNCTION__,highestAddr, totalPages, buddy_memmap_size);
+    log_line(LOG_DEBUG, "%s: highest addr: 0x%llx; Total pages: %llu; buddy_memmap_size: %llu bytes", __FUNCTION__,highestAddr, totalPages, buddy_memmap_size);
 
     // Find the first usable region to store our memmap
     for(size_t i = 0; i < memmap->entry_count; i++)
@@ -409,10 +409,13 @@ void pmm_page_dec_ref(uint64_t phys)
         page->ref_count--;
         if(page->ref_count == 0)
         {
+            // So no thread can modify it later
+            uint32_t savedOrder = page->order;
+
             // We have to release the lock before calling pmm_free_pages to evict deadlock
             spinlock_irq_release(&pmm_lock, &irq_flags);
 
-            pmm_free_pages(phys, page->order);
+            pmm_free_pages(phys, savedOrder);
             return; // Return immediately after because we already released the spinlock
         }
     }

@@ -161,6 +161,7 @@ void paging_map_page(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_addr
  * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
  * @param virt_addr The virtual address belonging to the page that we want to unmap
  * @param isHugePage If true then the virtual address belongs to a huge page (2MB)
+ * @param freePhysical If it should decrement the number of references to the physical page
  * @note After the unmapping it decrements the number of references to the physical page
  * @note virt_addr does not have to be aligned to a page boundary
  */
@@ -217,7 +218,7 @@ void paging_change_page_flags(uint64_t *pml4_root, uint64_t virt_addr, uint64_t 
 }
 
 /**
- * @brief This function maps a physically contiguos region into a virtually contiguos one
+ * @brief This function maps a physically contigous region into a virtually contigous one
  * 
  * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
  * @param virt_addr The starting virtual address belonging to the first page that we want to map to
@@ -244,7 +245,7 @@ void paging_map_region(uint64_t *pml4_root, uint64_t virt_addr, uint64_t phys_ad
  * @brief This function unmaps a virtually contiguos region
  * 
  * @param pml4_root The virtual address of the pml4 root, necessary because there can be many VAS
- * @param virt_addr The starting virtual address belonging to the first page that we want to map to
+ * @param virt_addr The starting virtual address belonging to the first page that we want to unmmap to
  * @param size The size of the region 
  * @param isHugePage If true then the mapped pages are considered huge pages (2MB)
  * @note virt_addr does not have to be aligned to a page boundary

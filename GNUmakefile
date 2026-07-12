@@ -60,7 +60,7 @@ kernel/.deps-obtained: ./kernel/get-deps
 	./kernel/get-deps
 
 .PHONY: kernel
-kernel: kernel/.deps-obtained
+kernel: kernel/include/* kernel/linker-scripts/* kernel/src/* kernel/GNUmakefile kernel/.deps-obtained
 	$(MAKE) -C kernel
 
 $(IMAGE_NAME).iso: limine/limine kernel

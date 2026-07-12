@@ -36,7 +36,7 @@ common_interrupt_handler:
     push r9
     push r8
     push rbp
-    push rsp
+    push rsp ; DON'T use this register, it's just for simmetry
     push rdi
     push rsi
     push rdx
